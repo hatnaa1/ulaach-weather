@@ -1844,6 +1844,13 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     ub_temp_str = f"{ub.get('temp_c'):+.1f}°C" if ub.get("temp_c") is not None else "—"
     ub_sun_str = f"{ub.get('sunrise', '07:19')} – {ub.get('sunset', '17:54')}"
 
+    station_options = []
+    for r in data["hubs"]:
+        sel = " selected" if r["sid"] == 292 else ""
+        station_options.append(
+            f"<option value='{r['sid']}'{sel}>{html.escape(r['station'])} ({html.escape(r['aimag'])}) — sid={r['sid']}</option>"
+        )
+
     html_doc = (
         _common_head("weather.ulaach.cc — Монгол орны Цаг агаар, Нар мандах & AQI Developer API", "weather")
         + f"""
@@ -1904,25 +1911,98 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 270px;gap:18px;align-items:start;margin-top:16px;">
-          <div>
-            <div class="mono muted" style="font-size:12px;margin-bottom:10px;">УЛААНБААТАР ХОТЫН ОЙРЫН ЦАГУУДЫН УРЬДЧИЛСАН МЭДЭЭ (SID=292)</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
-              {''.join(fore_cards)}
-            </div>
-          </div>
-          <div>
-            <div class="mono muted" style="font-size:11.5px;margin-bottom:6px;">IFRAME WIDGET (/weather.html)</div>
-            <iframe style="width:270px;height:255px;border:none;border-radius:10px;overflow:hidden;" src="/weather.html?sid=292&lang=MN&theme=dark"></iframe>
+        <div style="margin-top:16px;">
+          <div class="mono muted" style="font-size:12px;margin-bottom:10px;">УЛААНБААТАР ХОТЫН ОЙРЫН ЦАГУУДЫН УРЬДЧИЛСАН МЭДЭЭ (SID=292)</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+            {''.join(fore_cards)}
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 02. 28 Hub Stations with Sunrise/Sunset -->
+    <!-- 02. GET Parameters & Multi-language Weather IFrame Widget -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">02</span> 21 Аймаг ба Гол Станцуудын Бодит Ажиглалт + Нар мандах/жаргах</h2>
+        <h2 class="section-title"><span class="step-badge">02</span> Цаг агаарын Олон Хэлний IFrame Виджет ба GET Параметрүүд</h2>
+        <span class="section-meta">Supported Languages: MN, EN, CN, JP, KR • Dark &amp; Light</span>
+      </div>
+      <div class="section-body">
+        <div class="table-wrap" style="margin-bottom:16px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:140px;">Параметр</th>
+                <th style="width:210px;">Жишээ утга</th>
+                <th>Тайлбар</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-blue">sid</span></td>
+                <td class="mono">292 | 244 | 236 | 373</td>
+                <td>Станцын дугаар (<code>292</code> = Улаанбаатар, <code>244</code> = Дархан, <code>236</code> = Эрдэнэт, <code>373</code> = Даланзадгад г.м. 321 станц)</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">lang</span></td>
+                <td class="mono">MN | EN | CN | JP | KR</td>
+                <td>Виджетийн хэлний сонголт (Монгол, Англи, Хятад, Япон, Солонгос)</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-blue">theme</span></td>
+                <td class="mono">dark | light</td>
+                <td>Бараан (<code>dark</code>) эсвэл Цайвар (<code>light</code>) загвар</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <style>
+          .wx-tabs {{ display:inline-flex; gap:4px; background:#090d16; padding:3px; border-radius:6px; border:1px solid var(--border); }}
+          .wx-tab-btn {{
+            background:transparent; border:none; color:var(--muted); font-family:var(--mono);
+            font-size:11px; font-weight:600; padding:4px 9px; border-radius:4px; cursor:pointer;
+          }}
+          .wx-tab-btn.active {{ background:rgba(56,189,248,0.18); color:var(--accent); }}
+        </style>
+
+        <div style="display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start;">
+          <div class="code-box">
+            <div class="code-head" style="flex-wrap:wrap;gap:8px;">
+              <span>HTML Embed (IFrame Widget)</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="wx-sid-sel" style="background:#090d16;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:var(--mono);font-size:11.5px;">
+                  {''.join(station_options)}
+                </select>
+                <div class="wx-tabs" id="wx-lang-tabs">
+                  <button type="button" class="wx-tab-btn active" data-lang="MN">MN</button>
+                  <button type="button" class="wx-tab-btn" data-lang="EN">EN</button>
+                  <button type="button" class="wx-tab-btn" data-lang="CN">CN</button>
+                  <button type="button" class="wx-tab-btn" data-lang="JP">JP</button>
+                  <button type="button" class="wx-tab-btn" data-lang="KR">KR</button>
+                </div>
+                <div class="wx-tabs" id="wx-theme-tabs">
+                  <button type="button" class="wx-tab-btn active" data-theme="dark">Dark</button>
+                  <button type="button" class="wx-tab-btn" data-theme="light">Light</button>
+                </div>
+                <button class="copy-btn" data-copy="wx-code-iframe">Copy</button>
+              </div>
+            </div>
+            <pre id="wx-code-iframe">&lt;iframe
+  style="width:275px;height:255px;border:none;overflow:hidden;border-radius:10px;"
+  src="https://weather.ulaach.cc/weather.html?sid=292&amp;lang=MN&amp;theme=dark"&gt;
+&lt;/iframe&gt;</pre>
+          </div>
+          <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;justify-content:center;">
+            <iframe id="wx-widget-frame" style="width:270px;height:255px;border:none;border-radius:10px;overflow:hidden;" src="/weather.html?sid=292&lang=MN&theme=dark" title="Ulaach Weather Widget"></iframe>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03. 28 Hub Stations with Sunrise/Sunset -->
+    <section class="section-card">
+      <div class="section-head">
+        <h2 class="section-title"><span class="step-badge">03</span> 21 Аймаг ба Гол Станцуудын Бодит Ажиглалт + Нар мандах/жаргах</h2>
         <span class="section-meta">Шинэчлэгдсэн: {html.escape(data['latest_obs_ub'])} (GET /weather.json)</span>
       </div>
       <div class="section-body">
@@ -1950,10 +2030,10 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 03. AQI Table -->
+    <!-- 04. AQI Table -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">03</span> Агаарын Чанарын Индекс — AQI / PM2.5 / PM10</h2>
+        <h2 class="section-title"><span class="step-badge">04</span> Агаарын Чанарын Индекс — AQI / PM2.5 / PM10</h2>
         <span class="section-meta">GET /aqi.json</span>
       </div>
       <div class="section-body">
@@ -1978,10 +2058,10 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 04. Fire Risk Table -->
+    <!-- 05. Fire Risk Table -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">04</span> Ой, Хээрийн Түймрийн Эрсдэл ба Хуурайшилтын Индекс</h2>
+        <h2 class="section-title"><span class="step-badge">05</span> Ой, Хээрийн Түймрийн Эрсдэл ба Хуурайшилтын Индекс</h2>
         <span class="section-meta">GET /fire-risk.json</span>
       </div>
       <div class="section-body">
@@ -2006,6 +2086,65 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
 
     <div class="footer">weather.ulaach.cc • Real-time Meteorological, Sunrise &amp; AQI Data API</div>
   </main>
+  <script>
+    (function() {{
+      var curSid = '292';
+      var curLang = 'MN';
+      var curTheme = 'dark';
+      var frame = document.getElementById('wx-widget-frame');
+      var codeEl = document.getElementById('wx-code-iframe');
+      var sidSel = document.getElementById('wx-sid-sel');
+
+      function updateWxWidget() {{
+        var rel = '/weather.html?sid=' + encodeURIComponent(curSid) + '&lang=' + curLang + '&theme=' + curTheme;
+        frame.src = rel;
+        codeEl.textContent = [
+          '<iframe',
+          '  style="width:275px;height:255px;border:none;overflow:hidden;border-radius:10px;"',
+          '  src="https://weather.ulaach.cc' + rel + '">',
+          '</iframe>'
+        ].join(String.fromCharCode(10));
+      }}
+
+      if (sidSel) {{
+        sidSel.addEventListener('change', function() {{
+          curSid = sidSel.value;
+          updateWxWidget();
+        }});
+      }}
+
+      document.querySelectorAll('#wx-lang-tabs .wx-tab-btn').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+          document.querySelectorAll('#wx-lang-tabs .wx-tab-btn').forEach(function(b) {{ b.classList.remove('active'); }});
+          btn.classList.add('active');
+          curLang = btn.getAttribute('data-lang');
+          updateWxWidget();
+        }});
+      }});
+
+      document.querySelectorAll('#wx-theme-tabs .wx-tab-btn').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+          document.querySelectorAll('#wx-theme-tabs .wx-tab-btn').forEach(function(b) {{ b.classList.remove('active'); }});
+          btn.classList.add('active');
+          curTheme = btn.getAttribute('data-theme');
+          updateWxWidget();
+        }});
+      }});
+
+      document.querySelectorAll('.copy-btn').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+          var targetId = btn.getAttribute('data-copy');
+          var el = document.getElementById(targetId);
+          if (!el) return;
+          navigator.clipboard.writeText(el.innerText).then(function() {{
+            var orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(function() {{ btn.textContent = orig; }}, 1400);
+          }});
+        }});
+      }});
+    }})();
+  </script>
 </body>
 </html>"""
     )
