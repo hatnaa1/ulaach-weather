@@ -4,6 +4,7 @@ import asyncio
 import datetime
 import html
 import ipaddress
+import json
 import re
 import socket
 import ssl
@@ -126,6 +127,82 @@ def _fire_badge(idx: int | None) -> tuple[str, str]:
     if idx <= 4000:
         return ("Аюултай (IV зэрэг)", "#f97316")
     return ("Нэн аюултай (V зэрэг)", "#f43f5e")
+
+
+_LIVE_METEO_CACHE: dict[str, Any] = {"ts": 0.0, "by_sid": {}}
+
+WMO_LIVE_DESC: dict[int, str] = {
+    0: "Цэлмэг",
+    1: "Бага зэргийн үүлтэй",
+    2: "Солигдмол үүлтэй",
+    3: "Үүлэрхэг",
+    45: "Манантай",
+    48: "Цан хүүрэгтэй",
+    51: "Шиврээ бороо",
+    53: "Шиврээ бороо",
+    55: "Шиврээ бороо",
+    61: "Бага зэргийн бороо",
+    63: "Бороо орно",
+    65: "Их бороо",
+    71: "Ялимгүй цас",
+    73: "Цас орно",
+    75: "Их цас орно",
+    77: "Цасан ширхэг",
+    80: "Түр зуурын бороо",
+    85: "Түр зуурын цас",
+    86: "Их цас",
+    95: "Аадар бороо",
+}
+
+
+def _sync_fetch_open_meteo(coords: list[tuple[int, float, float]]) -> dict[int, dict[str, Any]]:
+    if not coords:
+        return {}
+    lats = ",".join(f"{c[1]:.4f}" for c in coords)
+    lons = ",".join(f"{c[2]:.4f}" for c in coords)
+    url = (
+        f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}"
+        "&current=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,surface_pressure,weather_code"
+        "&wind_speed_unit=ms&timezone=Asia%2FUlaanbaatar"
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "ulaach-weather/1.2"})
+    with urllib.request.urlopen(req, timeout=6) as resp:
+        data = json.loads(resp.read().decode("utf-8", "ignore"))
+    items = data if isinstance(data, list) else [data]
+    out: dict[int, dict[str, Any]] = {}
+    for (sid, _, _), item in zip(coords, items):
+        cur = item.get("current") or {}
+        if "temperature_2m" in cur:
+            wcode = cur.get("weather_code")
+            out[sid] = {
+                "temp_c": round(float(cur["temperature_2m"]), 1),
+                "feels_c": round(float(cur.get("apparent_temperature", cur["temperature_2m"])), 1),
+                "humidity_pct": int(round(float(cur["relative_humidity_2m"]))) if cur.get("relative_humidity_2m") is not None else None,
+                "wind_ms": round(float(cur["wind_speed_10m"]), 1) if cur.get("wind_speed_10m") is not None else None,
+                "wind_dir_deg": int(round(float(cur["wind_direction_10m"]))) if cur.get("wind_direction_10m") is not None else None,
+                "pressure_hpa": round(float(cur["surface_pressure"]), 1) if cur.get("surface_pressure") is not None else None,
+                "condition": WMO_LIVE_DESC.get(int(wcode), "Тогтуун") if wcode is not None else "Тогтуун",
+                "obs_time": str(cur.get("time", "")).replace("T", " "),
+            }
+    return out
+
+
+async def get_live_meteo_for_stations(coords: list[tuple[int, float, float]]) -> dict[int, dict[str, Any]]:
+    now = time.time()
+    cached = _LIVE_METEO_CACHE.get("by_sid", {})
+    if now - float(_LIVE_METEO_CACHE.get("ts", 0.0)) < 600 and all(s in cached for s, _, _ in coords):
+        return cached
+    try:
+        fresh = await asyncio.to_thread(_sync_fetch_open_meteo, coords)
+        if fresh:
+            merged = dict(cached)
+            merged.update(fresh)
+            _LIVE_METEO_CACHE["ts"] = now
+            _LIVE_METEO_CACHE["by_sid"] = merged
+            return merged
+    except Exception:
+        pass
+    return cached
 
 
 def extract_visitor_info(request: Request) -> dict[str, Any]:
@@ -1409,6 +1486,8 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
                 s.sum_name,
                 s.sta_name,
                 s.sta_28,
+                s.lat,
+                s.lon,
                 s.elev,
                 o.obs_time AT TIME ZONE 'Asia/Ulaanbaatar' AS obs_time_ub,
                 o.temp,
@@ -1500,8 +1579,15 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
             """
         )
 
+    coords = [(r["sid"], float(r["lat"]), float(r["lon"])) for r in hubs if r["lat"] is not None and r["lon"] is not None]
+    live_map = await get_live_meteo_for_stations(coords)
+
     hub_list = []
+    latest_live_time = None
     for r in hubs:
+        lv = live_map.get(r["sid"], {})
+        if lv.get("obs_time"):
+            latest_live_time = lv["obs_time"]
         hub_list.append(
             {
                 "sid": r["sid"],
@@ -1509,14 +1595,16 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
                 "sum": r["sum_name"],
                 "station": r["sta_name"],
                 "elev_m": r["elev"],
-                "obs_time": r["obs_time_ub"].strftime("%Y-%m-%d %H:%M") if r["obs_time_ub"] else None,
-                "temp_c": round(float(r["temp"]), 1) if r["temp"] is not None else None,
+                "obs_time": lv.get("obs_time") or (r["obs_time_ub"].strftime("%Y-%m-%d %H:%M") if r["obs_time_ub"] else None),
+                "temp_c": lv.get("temp_c") if lv.get("temp_c") is not None else (round(float(r["temp"]), 1) if r["temp"] is not None else None),
+                "feels_c": lv.get("feels_c"),
+                "temp_synop_c": round(float(r["temp"]), 1) if r["temp"] is not None else None,
                 "temp_min_c": round(float(r["temp_min"]), 1) if r["temp_min"] is not None else None,
                 "temp_max_c": round(float(r["temp_max"]), 1) if r["temp_max"] is not None else None,
-                "humidity_pct": r["humidity"],
-                "wind_ms": round(float(r["wind_speed"]), 1) if r["wind_speed"] is not None else None,
-                "pressure_hpa": round(float(r["pressure_slp"]), 1) if r["pressure_slp"] is not None else None,
-                "condition": _ww_text(r["ww"], r["cloud_nh"]),
+                "humidity_pct": lv.get("humidity_pct") if lv.get("humidity_pct") is not None else r["humidity"],
+                "wind_ms": lv.get("wind_ms") if lv.get("wind_ms") is not None else (round(float(r["wind_speed"]), 1) if r["wind_speed"] is not None else None),
+                "pressure_hpa": round(float(r["pressure_slp"]), 1) if r["pressure_slp"] is not None else lv.get("pressure_hpa"),
+                "condition": lv.get("condition") or _ww_text(r["ww"], r["cloud_nh"]),
                 "sunrise": r["sunrise"].strftime("%H:%M") if r["sunrise"] else None,
                 "sunset": r["sunset"].strftime("%H:%M") if r["sunset"] else None,
                 "day_length_min": r["day_length_min"],
@@ -1583,7 +1671,7 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
     return {
         "total_stations": stats["total_stations"] if stats else 321,
         "total_obs": stats["total_obs"] if stats else 0,
-        "latest_obs_ub": stats["latest_obs_ub"].strftime("%Y-%m-%d %H:%M") if stats and stats["latest_obs_ub"] else "—",
+        "latest_obs_ub": latest_live_time or (stats["latest_obs_ub"].strftime("%Y-%m-%d %H:%M") if stats and stats["latest_obs_ub"] else "—"),
         "hubs": hub_list,
         "aqi": aqi_list,
         "ub_forecast": fore_list,
@@ -1608,7 +1696,7 @@ async def render_weather_widget(
         row = await conn.fetchrow(
             """
             SELECT
-                s.sid, s.aimag_name, s.sta_name,
+                s.sid, s.aimag_name, s.sta_name, s.lat, s.lon,
                 o.temp, o.temp_min, o.temp_max, o.humidity, o.wind_speed, o.ww, o.cloud_nh,
                 o.obs_time AT TIME ZONE 'Asia/Ulaanbaatar' AS obs_time_ub,
                 sr.sunrise, sr.sunset
@@ -1645,11 +1733,19 @@ async def render_weather_widget(
             sid,
         )
 
+    lv = {}
+    if row and row["lat"] is not None and row["lon"] is not None:
+        lmap = await get_live_meteo_for_stations([(row["sid"], float(row["lat"]), float(row["lon"]))])
+        lv = lmap.get(row["sid"], {})
+
     sta_name = row["sta_name"] if row else "Улаанбаатар"
-    temp_str = f"{float(row['temp']):+.1f}°C" if row and row["temp"] is not None else "—"
-    cond_str = _ww_text(row["ww"] if row else None, row["cloud_nh"] if row else None)
-    wind_str = f"{float(row['wind_speed'] or 0):.1f} m/s"
-    hum_str = f"{row['humidity'] if row and row['humidity'] is not None else '—'}%"
+    eff_temp = lv.get("temp_c") if lv.get("temp_c") is not None else (float(row["temp"]) if row and row["temp"] is not None else None)
+    temp_str = f"{eff_temp:+.1f}°C" if eff_temp is not None else "—"
+    cond_str = lv.get("condition") or _ww_text(row["ww"] if row else None, row["cloud_nh"] if row else None)
+    eff_wind = lv.get("wind_ms") if lv.get("wind_ms") is not None else float(row["wind_speed"] or 0) if row else 0.0
+    wind_str = f"{eff_wind:.1f} m/s"
+    eff_hum = lv.get("humidity_pct") if lv.get("humidity_pct") is not None else (row["humidity"] if row else None)
+    hum_str = f"{eff_hum if eff_hum is not None else '—'}%"
     sun_str = (
         f"{row['sunrise'].strftime('%H:%M')} / {row['sunset'].strftime('%H:%M')}"
         if row and row["sunrise"] and row["sunset"]
@@ -2191,14 +2287,25 @@ async def render_portal_page(request: Request, fx_pool: asyncpg.Pool, wx_pool: a
         async with wx_pool.acquire() as conn:
             wrow = await conn.fetchrow(
                 """
-                SELECT temp, wind_speed, ww, cloud_nh
-                FROM wx.obs_data
-                WHERE sid = 292
-                ORDER BY obs_time DESC
-                LIMIT 1
+                SELECT s.lat, s.lon, o.temp, o.wind_speed, o.ww, o.cloud_nh
+                FROM wx.stations s
+                LEFT JOIN LATERAL (
+                    SELECT temp, wind_speed, ww, cloud_nh
+                    FROM wx.obs_data
+                    WHERE sid = s.sid
+                    ORDER BY obs_time DESC
+                    LIMIT 1
+                ) o ON true
+                WHERE s.sid = 292
                 """
             )
-            if wrow and wrow["temp"] is not None:
+            lmap = await get_live_meteo_for_stations([(292, 47.9185, 106.8483)])
+            lv_ub = lmap.get(292, {})
+            if lv_ub.get("temp_c") is not None:
+                ub_temp = f"{lv_ub['temp_c']:+.1f}°C"
+                ub_wind = f"{lv_ub.get('wind_ms', 0):.1f} м/с"
+                ub_cond = lv_ub.get("condition", "Тогтуун")
+            elif wrow and wrow["temp"] is not None:
                 ub_temp = f"{float(wrow['temp']):+.1f}°C"
                 ub_wind = f"{float(wrow['wind_speed'] or 0):.1f} м/с"
                 ub_cond = _ww_text(wrow["ww"], wrow["cloud_nh"])
