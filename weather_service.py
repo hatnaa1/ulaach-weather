@@ -1027,10 +1027,6 @@ def render_sitemap_xml(host: str) -> str:
     host_urls: dict[str, list[tuple[str, str, str]]] = {
         "ulaach.cc": [
             ("https://ulaach.cc/", "hourly", "1.0"),
-            ("https://fx.ulaach.cc/", "hourly", "0.9"),
-            ("https://weather.ulaach.cc/", "hourly", "0.9"),
-            ("https://tool.ulaach.cc/", "daily", "0.8"),
-            ("https://util.ulaach.cc/", "weekly", "0.8"),
         ],
         "fx.ulaach.cc": [
             ("https://fx.ulaach.cc/", "hourly", "1.0"),
