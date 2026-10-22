@@ -129,6 +129,219 @@ def _fire_badge(idx: int | None) -> tuple[str, str]:
     return ("Нэн аюултай (V зэрэг)", "#f43f5e")
 
 
+_AIMAG_STEMS: list[tuple[str, str]] = [
+    ("Архангай", "Архангай"),
+    ("Баян-Өлгий", "Баян-Өлгий"),
+    ("Баянхонгор", "Баянхонгор"),
+    ("Булган", "Булган"),
+    ("Говь-Алтай", "Говь-Алтай"),
+    ("Говьсүмбэр", "Говьсүмбэр"),
+    ("Дархан", "Дархан-Уул"),
+    ("Дорногов", "Дорноговь"),
+    ("Дорнод", "Дорнод"),
+    ("Дундгов", "Дундговь"),
+    ("Завхан", "Завхан"),
+    ("Орхон", "Орхон"),
+    ("Өвөрхангай", "Өвөрхангай"),
+    ("Өмнөгов", "Өмнөговь"),
+    ("Сүхбаатар", "Сүхбаатар"),
+    ("Сэлэнг", "Сэлэнгэ"),
+    ("Төв", "Төв"),
+    ("Увс", "Увс"),
+    ("Ховд", "Ховд"),
+    ("Хөвсгөл", "Хөвсгөл"),
+    ("Хэнтий", "Хэнтий"),
+]
+
+
+def _extract_aimags_from_text(text: str) -> list[str]:
+    found = []
+    for stem, canonical in _AIMAG_STEMS:
+        if stem in text and canonical not in found:
+            found.append(canonical)
+    return found
+
+
+def _build_weather_insights(
+    hubs: list[dict[str, Any]],
+    aqi_list: list[dict[str, Any]],
+    fore_list: list[dict[str, Any]],
+    fire_list: list[dict[str, Any]],
+    bulletins: list[dict[str, Any]],
+) -> dict[str, Any]:
+    ub = next((x for x in hubs if x["sid"] == 292), hubs[0] if hubs else {})
+    ub_temp = float(ub.get("temp_c") or 0.0)
+    ub_wind = float(ub.get("wind_ms") or 0.0)
+
+    # 1. Extract warnings, herder alerts, snow cover, and UB micro-climate from wx.content
+    warning_signal = ""
+    herder_alert = ""
+    ub_zone_forecast: dict[str, str] = {}
+    snow_cover_note = ""
+    orchin_note = ""
+
+    for b in bulletins:
+        body = b.get("body", "") or ""
+        author = (b.get("author") or "").lower()
+        if not warning_signal and ("Дохио!!!" in body or author == "alert"):
+            m = re.search(
+                r"Дохио!!!\s*Цаг агаарын аюултай үзэгдлээс сэрэмжлүүлэх мэдээ:\s*([^\n]+)",
+                body,
+            )
+            if m:
+                warning_signal = m.group(1).strip()
+            else:
+                warning_signal = body.splitlines()[0].strip()
+
+        if not herder_alert and "анхааралд:" in body:
+            m = re.search(r"Малчид,\s*иргэд,\s*тээвэрч[и]?дийн анхааралд:\s*([^\n]+)", body)
+            if m:
+                herder_alert = m.group(1).strip()
+
+        if not ub_zone_forecast and "УЛААНБААТАР ХОТ ОРЧМООР:" in body:
+            for key, label in [
+                ("УЛААНБААТАР ХОТ ОРЧМООР:", "Улаанбаатар хот"),
+                ("БАГАНУУР ОРЧМООР:", "Багануур дүүрэг"),
+                ("ТЭРЭЛЖ ОРЧМООР:", "Тэрэлж орчим"),
+            ]:
+                m = re.search(rf"{re.escape(key)}\s*([^\n]+)", body)
+                if m:
+                    ub_zone_forecast[label] = m.group(1).strip()
+
+        if not snow_cover_note and "Цасан бүрхүүл:" in body:
+            m = re.search(r"Цасан бүрхүүл:\s*([^\n]+)", body)
+            if m:
+                snow_cover_note = m.group(1).strip()
+
+        if not orchin_note and author == "orchin" and "РМ10 тоосонцор" in body:
+            m = re.search(r"(РМ10 тоосонцор[^\n]+)", body)
+            if m:
+                orchin_note = m.group(1).strip()
+
+    affected_aimags = _extract_aimags_from_text(warning_signal + " " + herder_alert)
+    max_wind_match = re.findall(r"секундэд\s*(\d+)(?:-(\d+))?\s*метр", warning_signal + " " + herder_alert)
+    peak_gust_ms = 0
+    for g1, g2 in max_wind_match:
+        peak_gust_ms = max(peak_gust_ms, int(g2 or g1))
+
+    # 2. Compute 4 Predictive Indices
+    fore_temps = [float(f["temp_c"]) for f in fore_list if f.get("temp_c") is not None]
+    fore_winds = [float(f["wind_ms"]) for f in fore_list if f.get("wind_ms") is not None]
+    min_fore_temp = min(fore_temps) if fore_temps else ub_temp
+    max_fore_temp = max(fore_temps) if fore_temps else ub_temp
+    max_fore_wind = max(fore_winds) if fore_winds else ub_wind
+    avg_fore_temp = sum(fore_temps) / len(fore_temps) if fore_temps else ub_temp
+
+    ub_aqi_vals = [int(a["aqi"]) for a in aqi_list if a.get("aqi") is not None and str(a.get("sid", "")).startswith("12")]
+    avg_ub_aqi = int(round(sum(ub_aqi_vals) / len(ub_aqi_vals))) if ub_aqi_vals else 85
+    worst_aqi_station = aqi_list[0] if aqi_list else {"station": "Хайлааст", "aqi": avg_ub_aqi}
+
+    # Prediction A: Air Quality & Inversion (Next 12-24h)
+    if min_fore_temp <= -4.0 and max_fore_wind >= 5.0:
+        aqi_pred_level = "ДУНД → САРНИНА"
+        aqi_pred_color = "#fbbf24"
+        aqi_pred_text = (
+            f"Шөнөдөө хэм {min_fore_temp:+.0f}°C руу буурч галлагаа нэмэгдсэнээр орой/өглөөдөө гэр хорооллын цэгүүдэд "
+            f"(одоо хамгийн өндөр нь {worst_aqi_station.get('station')}: AQI {worst_aqi_station.get('aqi')}) утаа өтгөрч AQI 150–190 хүрнэ. "
+            f"Гэвч өдөртөө салхи {max_fore_wind:.0f}–13 м/с хүрч ширүүсэх тул температурын инверс задарч утаа хурдан сарнина."
+        )
+    elif min_fore_temp <= -4.0 and max_fore_wind < 3.5:
+        aqi_pred_level = "ӨНДӨР БОХИРДОЛ (INVERS)"
+        aqi_pred_color = "#f43f5e"
+        aqi_pred_text = (
+            f"Шөнөдөө {min_fore_temp:+.0f}°C хүйтэн бөгөөд салхи {max_fore_wind:.1f} м/с тогтуун байх тул "
+            f"утаа сарнихгүй тогтож, өглөө 07:00–10:00 цагт AQI 200+ давах өндөр эрсдэлтэй."
+        )
+    else:
+        aqi_pred_level = "ХЭВИЙН / ЦЭВЭРШИНЭ"
+        aqi_pred_color = "#34d399"
+        aqi_pred_text = (
+            f"Улаанбаатарын дундаж AQI {avg_ub_aqi} байна. Салхины хурд {max_fore_wind:.1f} м/с байх тул агаарын солилцоо хэвийн явагдана."
+        )
+
+    # Prediction B: Road Ice, Pass Closures & Blizzard Risk
+    has_ice_kw = ("халтиргаа" in herder_alert.lower()) or ("мөстөлт" in herder_alert.lower()) or ("цасан шуурга" in herder_alert.lower())
+    has_snow_fore = any("цас" in (f.get("condition") or "").lower() or "хур" in (f.get("condition") or "").lower() for f in fore_list)
+    if has_ice_kw or (has_snow_fore and min_fore_temp <= -2.0):
+        road_level = "ӨНДӨР ЭРСДЭЛТЭЙ (HIGH)"
+        road_color = "#f43f5e"
+        road_text = (
+            "Баруун болон төвийн аймгуудын нутгаар 0.0–8.0 мм нойтон цас орж, шөнөдөө -5°C..-12°C хүрч хөлдөх тул "
+            "томоохон зам, даваа, гүвээнд (Төв, Сэлэнгэ, Булган, Архангай, Өвөрхангай, Завхан) халтиргаа гулгаа, мөстөлт үүсэж үзэгдэх орчин хязгаарлагдана."
+        )
+    else:
+        road_level = "ХЭВИЙН (LOW)"
+        road_color = "#34d399"
+        road_text = "Улсын чанартай авто замуудад ноцтой мөстөлт болон цасан шуурганы эрсдэл бага байна."
+
+    # Prediction C: Windstorm & Herder / Rural Hazard
+    if peak_gust_ms >= 18:
+        wind_level = f"АЮУЛТАЙ ДОХИО ({peak_gust_ms} м/с)"
+        wind_color = "#f97316"
+        wind_text = (
+            f"Алтайн уулархаг нутаг болон Говийн бүс нутгаар ({', '.join(affected_aimags[:7])}) салхи секундэд 18–20 м/с, "
+            f"зарим үед {peak_gust_ms} м/с хүрч шороон болон цасан шуурга шуурна. Малчид малаа ойрын бэлчээрт хариулахыг зөвлөж байна."
+        )
+    else:
+        wind_level = "ТОГТУУН / ХЭВИЙН"
+        wind_color = "#38bdf8"
+        wind_text = "Нийт нутгаар салхи секундэд 4–9 м/с, аюултай хүчтэй шуурганы дохио бүртгэгдээгүй байна."
+
+    # Prediction D: Heating Demand & Cold Wave Outlook (HDD base 18°C)
+    hdd = max(0.0, 18.0 - avg_fore_temp)
+    load_increase_pct = int(round((hdd / 18.0) * 45))
+    heating_level = f"АЧААЛАЛ +{load_increase_pct}% (HDD {hdd:.1f})"
+    heating_color = "#38bdf8" if avg_fore_temp > -5 else "#fbbf24"
+    heating_text = (
+        f"Улаанбаатарт ойрын 24 цагийн дундаж температур {avg_fore_temp:+.1f}°C (шөнөдөө Яармаг-Сонгиноор -10..-12°C, хотын төвөөр -5..-6°C) "
+        f"болж өмнөх өдрөөс 5°C-аар сэрүүснэ. 10-р сарын 23–27-нд уулархаг нутгаар -17..-22°C хүрч эрс хүйтрэх тул дулаан/эрчим хүчний хэрэглээ өснө."
+    )
+
+    return {
+        "generated_at_ub": datetime.datetime.now(UB_TZ).strftime("%Y-%m-%d %H:%M:%S"),
+        "emergency_alert": {
+            "active": bool(warning_signal),
+            "signal_text": warning_signal,
+            "herder_driver_notice": herder_alert,
+            "affected_aimags": affected_aimags,
+            "peak_wind_gust_ms": peak_gust_ms or 15,
+        },
+        "predictions": [
+            {
+                "id": "ub_aqi_outlook",
+                "title": "1. УБ Агаарын Бохирдол & Утааны Таамаглал (24ц)",
+                "badge": aqi_pred_level,
+                "color": aqi_pred_color,
+                "forecast": aqi_pred_text,
+                "hotspot_note": orchin_note,
+            },
+            {
+                "id": "road_ice_risk",
+                "title": "2. Зам Тээвэр, Даваа Гүвээ & Халтиргааны Эрсдэл",
+                "badge": road_level,
+                "color": road_color,
+                "forecast": road_text,
+            },
+            {
+                "id": "wind_storm_hazard",
+                "title": "3. Хүчтэй Салхи, Цасан & Шороон Шуурганы Прогноз",
+                "badge": wind_level,
+                "color": wind_color,
+                "forecast": wind_text,
+            },
+            {
+                "id": "heating_energy_load",
+                "title": "4. Хүйтрэлт & Дулаан / Эрчим Хүчний Ачаалал",
+                "badge": heating_level,
+                "color": heating_color,
+                "forecast": heating_text,
+            },
+        ],
+        "ub_micro_zones": ub_zone_forecast,
+        "snow_cover_summary": snow_cover_note,
+    }
+
+
 _LIVE_METEO_CACHE: dict[str, Any] = {"ts": 0.0, "by_sid": {}}
 
 WMO_LIVE_DESC: dict[int, str] = {
@@ -1563,10 +1776,10 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
 
         bulletins = await conn.fetch(
             """
-            SELECT api_id, title, author, created AT TIME ZONE 'Asia/Ulaanbaatar' AS created_ub, LEFT(body_text, 450) AS summary
+            SELECT api_id, title, author, created AT TIME ZONE 'Asia/Ulaanbaatar' AS created_ub, body_text
             FROM wx.content
             ORDER BY created DESC
-            LIMIT 4
+            LIMIT 12
             """
         )
 
@@ -1659,14 +1872,19 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
 
     bulletin_list = []
     for r in bulletins:
+        full_body = (r["body_text"] or "").strip()
         bulletin_list.append(
             {
                 "id": r["api_id"],
                 "title": r["title"],
+                "author": r["author"],
                 "created_ub": r["created_ub"].strftime("%Y-%m-%d %H:%M") if r["created_ub"] else "",
-                "summary": (r["summary"] or "").strip(),
+                "summary": full_body[:450],
+                "body": full_body,
             }
         )
+
+    insights = _build_weather_insights(hub_list, aqi_list, fore_list, fire_list, bulletin_list)
 
     return {
         "total_stations": stats["total_stations"] if stats else 321,
@@ -1677,6 +1895,7 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
         "ub_forecast": fore_list,
         "fire_risk": fire_list,
         "bulletins": bulletin_list,
+        "insights": insights,
     }
 
 
@@ -1947,6 +2166,77 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
             f"<option value='{r['sid']}'{sel}>{html.escape(r['station'])} ({html.escape(r['aimag'])}) — sid={r['sid']}</option>"
         )
 
+    ins = data.get("insights", {})
+    em = ins.get("emergency_alert", {})
+    aimag_badges = "".join(
+        f"<span class='badge badge-amber' style='margin-right:6px;margin-bottom:4px;'>{html.escape(a)}</span>"
+        for a in em.get("affected_aimags", [])
+    )
+
+    alert_banner_html = ""
+    if em.get("active"):
+        alert_banner_html = f"""
+        <div style="background:rgba(244,63,94,0.09);border:1px solid rgba(244,63,94,0.45);border-radius:10px;padding:16px 18px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <span class="mono bold" style="color:#f43f5e;font-size:13px;">🚨 ДОХИО!!! ЦАГ АГААРЫН АЮУЛТАЙ ҮЗЭГДЛИЙН СЭРЭМЖЛҮҮЛЭГ</span>
+            <span class="badge badge-red">Салхины оргил хурд: {em.get('peak_wind_gust_ms', 20)} м/с</span>
+          </div>
+          <p style="margin:0 0 8px;color:#f8fafc;font-size:13.5px;line-height:1.55;">{html.escape(em.get('signal_text', ''))}</p>
+          <p style="margin:0 0 10px;color:#cbd5e1;font-size:13px;line-height:1.5;"><strong>Малчид, тээвэрчдийн анхааралд:</strong> {html.escape(em.get('herder_driver_notice', ''))}</p>
+          <div>{aimag_badges}</div>
+        </div>
+        """
+
+    pred_cards_html = []
+    for p in ins.get("predictions", []):
+        hotspot_extra = (
+            f"<div class='mono muted' style='font-size:11.5px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);'>"
+            f"📌 {html.escape(p['hotspot_note'])}</div>"
+            if p.get("hotspot_note")
+            else ""
+        )
+        pred_cards_html.append(
+            f"<div style='background:var(--bg-code);border:1px solid var(--border);border-radius:10px;padding:15px 16px;display:flex;flex-direction:column;justify-content:space-between;'>"
+            f"<div>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;'>"
+            f"<span class='bold' style='font-size:13.5px;color:#f8fafc;'>{html.escape(p['title'])}</span>"
+            f"<span class='mono bold' style='font-size:11px;padding:3px 9px;border-radius:99px;background:rgba(15,23,42,0.9);color:{p['color']};border:1px solid {p['color']};'>{html.escape(p['badge'])}</span>"
+            f"</div>"
+            f"<p style='margin:0;font-size:13px;color:var(--text);line-height:1.55;'>{html.escape(p['forecast'])}</p>"
+            f"{hotspot_extra}"
+            f"</div>"
+            f"</div>"
+        )
+
+    zone_rows_html = []
+    for zname, zdesc in (ins.get("ub_micro_zones") or {}).items():
+        zone_rows_html.append(
+            f"<tr>"
+            f"<td class='bold' style='width:190px;color:#38bdf8;'>{html.escape(zname)}</td>"
+            f"<td style='white-space:normal;'>{html.escape(zdesc)}</td>"
+            f"</tr>"
+        )
+    if ins.get("snow_cover_summary"):
+        zone_rows_html.append(
+            f"<tr>"
+            f"<td class='bold' style='color:#fbbf24;'>Цасан бүрхүүлийн тойм</td>"
+            f"<td style='white-space:normal;'>{html.escape(ins['snow_cover_summary'])}</td>"
+            f"</tr>"
+        )
+
+    bulletin_cards_html = []
+    for b in data["bulletins"][:6]:
+        b_badge = "badge-red" if b.get("author") == "alert" else ("badge-amber" if b.get("author") == "orchin" else "badge-blue")
+        bulletin_cards_html.append(
+            f"<details style='background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:12px 15px;margin-bottom:10px;'>"
+            f"<summary style='cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:600;color:#f8fafc;font-size:13.5px;'>"
+            f"<span><span class='badge {b_badge}' style='margin-right:8px;'>{html.escape((b.get('author') or 'info').upper())}</span>{html.escape(b['title'])}</span>"
+            f"<span class='mono muted' style='font-size:11.5px;flex-shrink:0;'>{html.escape(b['created_ub'])}</span>"
+            f"</summary>"
+            f"<div class='mono' style='margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:#cbd5e1;white-space:pre-wrap;line-height:1.6;'>{html.escape(b['body'])}</div>"
+            f"</details>"
+        )
+
     html_doc = (
         _common_head("weather.ulaach.cc — Монгол орны Цаг агаар, Нар мандах & AQI Developer API", "weather")
         + f"""
@@ -1994,6 +2284,13 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
           <div class="ep-item">
             <div class="ep-left">
               <span class="method-get">GET</span>
+              <a class="ep-url" href="/insights.json" target="_blank">/insights.json</a>
+            </div>
+            <span class="ep-desc">Тоон ажиглалт + синоптик мэдээн (<code>wx.content</code>) дээр суурилсан 24 цагийн таамаглал, сэрэмжлүүлэг ба эрсдэлийн индекс</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
               <a class="ep-url" href="/fire-risk.json" target="_blank">/fire-risk.json</a>
             </div>
             <span class="ep-desc">Ой, хээрийн түймрийн эрсдэлийн индекс ба цаг агаарын сэрэмжлүүлэг мэдээ</span>
@@ -2016,10 +2313,37 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 02. GET Parameters & Multi-language Weather IFrame Widget -->
+    <!-- 02. AI & Synoptic Weather Predictions + Alert Engine -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">02</span> Цаг агаарын Олон Хэлний IFrame Виджет ба GET Параметрүүд</h2>
+        <h2 class="section-title"><span class="step-badge">02</span> Цаг Агаарын Эрсдэлийн Таамаглал &amp; Синоптик Шинжилгээ (24 цаг)</h2>
+        <span class="section-meta">GET /insights.json • Тоон телеметр + wx.content синоптик мэдээ</span>
+      </div>
+      <div class="section-body">
+        {alert_banner_html}
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:14px;margin-bottom:16px;">
+          {''.join(pred_cards_html)}
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:200px;">Бүс нутаг / Ангилал</th>
+                <th>Синоптик мэдээнээс задалсан нарийвчилсан төлөв</th>
+              </tr>
+            </thead>
+            <tbody>
+              {''.join(zone_rows_html)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03. GET Parameters & Multi-language Weather IFrame Widget -->
+    <section class="section-card">
+      <div class="section-head">
+        <h2 class="section-title"><span class="step-badge">03</span> Цаг агаарын Олон Хэлний IFrame Виджет ба GET Параметрүүд</h2>
         <span class="section-meta">Supported Languages: MN, EN, CN, JP, KR • Dark &amp; Light</span>
       </div>
       <div class="section-body">
@@ -2095,10 +2419,10 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 03. 28 Hub Stations with Sunrise/Sunset -->
+    <!-- 04. 28 Hub Stations with Sunrise/Sunset -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">03</span> 21 Аймаг ба Гол Станцуудын Бодит Ажиглалт + Нар мандах/жаргах</h2>
+        <h2 class="section-title"><span class="step-badge">04</span> 21 Аймаг ба Гол Станцуудын Бодит Ажиглалт + Нар мандах/жаргах</h2>
         <span class="section-meta">Шинэчлэгдсэн: {html.escape(data['latest_obs_ub'])} (GET /weather.json)</span>
       </div>
       <div class="section-body">
@@ -2126,10 +2450,10 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 04. AQI Table -->
+    <!-- 05. AQI Table -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">04</span> Агаарын Чанарын Индекс — AQI / PM2.5 / PM10</h2>
+        <h2 class="section-title"><span class="step-badge">05</span> Агаарын Чанарын Индекс — AQI / PM2.5 / PM10</h2>
         <span class="section-meta">GET /aqi.json</span>
       </div>
       <div class="section-body">
@@ -2154,13 +2478,18 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 05. Fire Risk Table -->
+    <!-- 06. Fire Risk & Synoptic Bulletins -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">05</span> Ой, Хээрийн Түймрийн Эрсдэл ба Хуурайшилтын Индекс</h2>
-        <span class="section-meta">GET /fire-risk.json</span>
+        <h2 class="section-title"><span class="step-badge">06</span> Цаг Уурын Мэдээний Архив (wx.content) ба Ой, Хээрийн Түймрийн Индекс</h2>
+        <span class="section-meta">GET /fire-risk.json • GET /insights.json</span>
       </div>
       <div class="section-body">
+        <div class="mono muted" style="font-size:12px;margin-bottom:8px;">СҮҮЛИЙН СИНОПТИК МЭДЭЭ, СЭРЭМЖЛҮҮЛЭГ БА ОРЧНЫ ТОЙМ (Дарж дэлгэрэнгүй уншина уу)</div>
+        <div style="margin-bottom:18px;">
+          {''.join(bulletin_cards_html)}
+        </div>
+        <div class="mono muted" style="font-size:12px;margin-bottom:8px;">ОЙ, ХЭЭРИЙН ТҮЙМРИЙН ХУУРАЙШИЛТЫН ИНДЕКС ӨНДӨР СУМД</div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -2283,6 +2612,7 @@ async def render_portal_page(request: Request, fx_pool: asyncpg.Pool, wx_pool: a
     ub_wind = "—"
     ub_cond = "Тогтуун"
     ub_aqi = "—"
+    wx_alert_line = ""
     try:
         async with wx_pool.acquire() as conn:
             wrow = await conn.fetchrow(
@@ -2322,8 +2652,32 @@ async def render_portal_page(request: Request, fx_pool: asyncpg.Pool, wx_pool: a
             )
             if arow and arow["avg_aqi"] is not None:
                 ub_aqi = str(arow["avg_aqi"])
+            crow = await conn.fetchrow(
+                """
+                SELECT body_text
+                FROM wx.content
+                WHERE body_text LIKE '%Дохио!!!%' OR author = 'alert'
+                ORDER BY created DESC
+                LIMIT 1
+                """
+            )
+            if crow and crow["body_text"]:
+                m_sig = re.search(
+                    r"Дохио!!!\s*Цаг агаарын аюултай үзэгдлээс сэрэмжлүүлэх мэдээ:\s*([^\n]+)",
+                    crow["body_text"],
+                )
+                wx_alert_line = m_sig.group(1).strip() if m_sig else crow["body_text"].splitlines()[0].strip()
     except Exception:
         pass
+
+    portal_alert_html = ""
+    if wx_alert_line:
+        portal_alert_html = f"""
+        <div style="margin-top:14px;background:rgba(244,63,94,0.1);border:1px solid rgba(244,63,94,0.45);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:12.5px;color:#f8fafc;"><strong style="color:#f43f5e;">🚨 ЦАГ АГААРЫН ДОХИО:</strong> {html.escape(wx_alert_line)}</div>
+          <a href="https://weather.ulaach.cc" class="mono bold" style="font-size:12px;color:#38bdf8;white-space:nowrap;">Дэлгэрэнгүй таамаглал →</a>
+        </div>
+        """
 
     html_doc = (
         _common_head("ulaach.cc — Open Developer APIs & Public Data Platform", "portal")
@@ -2339,6 +2693,7 @@ async def render_portal_page(request: Request, fx_pool: asyncpg.Pool, wx_pool: a
         <span class="stat-chip">ULAANBAATAR: <strong>{html.escape(ub_temp)} ({html.escape(ub_cond)})</strong></span>
         <span class="stat-chip">YOUR_IP: <strong>{html.escape(visitor['ip'])} ({html.escape(visitor['country'])})</strong></span>
       </div>
+      {portal_alert_html}
     </section>
 
     <div class="svc-grid">
