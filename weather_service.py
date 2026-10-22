@@ -5,6 +5,7 @@ import datetime
 import html
 import ipaddress
 import json
+import os
 import re
 import socket
 import ssl
@@ -845,9 +846,246 @@ def parse_mongolian_regno(regno: str) -> dict[str, Any]:
     }
 
 
+# ==============================================================================
+# SEO METADATA, ROBOTS, SITEMAP & OPENGRAPH GENERATOR
+# ==============================================================================
+_SEO_CONFIG: dict[str, dict[str, str]] = {
+    "portal": {
+        "canonical": "https://ulaach.cc/",
+        "title": "ulaach.cc — Нээлттэй Өгөгдөл ба Developer API Платформ",
+        "description": "Монголбанк ба арилжааны банкуудын валютын ханш (fx.ulaach.cc), 21 аймаг 321 станцын цаг агаар, нар мандах ба агаарын чанар AQI (weather.ulaach.cc), сүлжээний оношилгоо (tool.ulaach.cc) болон монгол хэл/санхүүгийн хөрвүүлэлтийн (util.ulaach.cc) нээлттэй JSON API экосистем.",
+        "keywords": "ulaach, developer api mongolia, нээлттэй өгөгдөл, валютын ханш api, цаг агаар api, монголбанк ханш, aqi ulaanbaatar, num2words mongolian",
+        "badge": "OPEN DATA & DEVELOPER ECOSYSTEM",
+        "accent": "#34d399",
+    },
+    "fx": {
+        "canonical": "https://fx.ulaach.cc/",
+        "title": "fx.ulaach.cc — Монголбанк ба Арилжааны Банкуудын Валютын Ханшийн Developer API",
+        "description": "Монголбанкны 38 валютын албан ханш, өмнөх өдрөөс өөрчлөлт, 30 хоногийн түүхэн график, Хаан/Голомт/ХХБ-ны валютын ханш, шууд хөрвүүлэгч (/convert.json) болон 5 хэлний веб IFrame виджет (/xansh.html).",
+        "keywords": "валютын ханш, монголбанк ханш, ханшийн api, xansh json, валют хөрвүүлэгч, хаан банк ханш, голомт банк ханш, fx.ulaach.cc",
+        "badge": "FOREIGN EXCHANGE & BANK RATES API",
+        "accent": "#10b981",
+    },
+    "weather": {
+        "canonical": "https://weather.ulaach.cc/",
+        "title": "weather.ulaach.cc — Монгол Орны Цаг Агаар, Нар Мандах, AQI & Эрсдэлийн Таамаглалын API",
+        "description": "Монгол улсын 21 аймаг, 321 сумын бодит цагийн цаг агаар, нар мандах/жаргах цаг, Улаанбаатарын агаарын чанар (AQI/PM2.5/PM10), ой хээрийн түймрийн индекс, синоптик эрсдэлийн 24 цагийн таамаглал (/insights.json) болон цаг агаарын виджет.",
+        "keywords": "цаг агаар, улаанбаатар цаг агаар, агаарын чанар aqi, нар мандах цаг, цаг агаарын мэдээ api, түймрийн эрсдэл, weather.ulaach.cc",
+        "badge": "METEOROLOGY, AQI & SYNOPTIC INSIGHTS API",
+        "accent": "#38bdf8",
+    },
+    "tool": {
+        "canonical": "https://tool.ulaach.cc/",
+        "title": "tool.ulaach.cc — Миний IP Хаяг, GeoIP/ASN, DNS, SSL & TCP Порт Оношилгооны API",
+        "description": "Таны бодит IPv4/IPv6 хаяг, Cloudflare Edge зангилаа, дурын IP болон домэйны ISP/ASN/GeoIP мэдээлэл (/lookup), DNS рекордууд (/dns), SSL сертификатын хугацаа (/ssl), TCP порт шалгагч (/port).",
+        "keywords": "what is my ip mongolia, миний ip хаяг, dns lookup api, ssl checker api, port checker, network diagnostic tool, tool.ulaach.cc",
+        "badge": "NETWORK & IP DIAGNOSTIC SUITE",
+        "accent": "#fbbf24",
+    },
+    "util": {
+        "canonical": "https://util.ulaach.cc/",
+        "title": "util.ulaach.cc — Монгол Тоог Үсгээр Бичих, Кирилл-Латин Галиг & Регистр Задлагч API",
+        "description": "Санхүү, ERP, нэхэмжлэхийн мөнгөн дүнг монгол үсгээр бичих (/num2words), Кирилл ба Латин текст хооронд галиглах (/translit), иргэний регистрийн дугаараас төрсөн огноо, нас, хүйс, аймаг задлах (/regno) Developer API.",
+        "keywords": "тоог үсгээр бичих, мөнгөн дүн үсгээр, кирилл латин хөрвүүлэгч, регистрийн дугаар шалгах, mongolian num2words api, util.ulaach.cc",
+        "badge": "MONGOLIAN FINTECH & LANGUAGE UTILITIES",
+        "accent": "#a78bfa",
+    },
+}
+
+
+def build_seo_meta_html(active_site: str, title_override: str | None = None) -> str:
+    cfg = _SEO_CONFIG.get(active_site, _SEO_CONFIG["portal"])
+    title = title_override or cfg["title"]
+    desc = cfg["description"]
+    canonical = cfg["canonical"]
+    keywords = cfg["keywords"]
+    og_img = f"{canonical.rstrip('/')}/og-image.svg?site={active_site}"
+
+    verify_tags = []
+    g_ver = os.getenv("GOOGLE_SITE_VERIFICATION", "").strip()
+    b_ver = os.getenv("BING_SITE_VERIFICATION", "").strip()
+    if g_ver:
+        verify_tags.append(f'  <meta name="google-site-verification" content="{html.escape(g_ver)}" />')
+    if b_ver:
+        verify_tags.append(f'  <meta name="msvalidate.01" content="{html.escape(b_ver)}" />')
+    verify_block = ("\n" + "\n".join(verify_tags)) if verify_tags else ""
+
+    json_ld = {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "@id": f"{canonical}#website",
+                "url": canonical,
+                "name": title,
+                "description": desc,
+                "inLanguage": "mn-MN",
+                "publisher": {
+                    "@type": "Organization",
+                    "name": "Ulaach Developer Platform",
+                    "url": "https://ulaach.cc/",
+                },
+            },
+            {
+                "@type": "WebAPI",
+                "@id": f"{canonical}#webapi",
+                "name": title,
+                "description": desc,
+                "url": canonical,
+                "documentation": canonical,
+                "termsOfService": "https://ulaach.cc/",
+                "provider": {
+                    "@type": "Organization",
+                    "name": "Ulaach Open Data Ecosystem",
+                    "url": "https://ulaach.cc/",
+                },
+            },
+        ],
+    }
+    json_ld_str = json.dumps(json_ld, ensure_ascii=False)
+
+    return f"""  <meta name="description" content="{html.escape(desc)}" />
+  <meta name="keywords" content="{html.escape(keywords)}" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <link rel="canonical" href="{html.escape(canonical)}" />
+  <link rel="alternate" hreflang="mn" href="{html.escape(canonical)}" />
+  <link rel="alternate" hreflang="x-default" href="{html.escape(canonical)}" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="theme-color" content="#090d16" />{verify_block}
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ulaach.cc Developer Platform" />
+  <meta property="og:locale" content="mn_MN" />
+  <meta property="og:title" content="{html.escape(title)}" />
+  <meta property="og:description" content="{html.escape(desc)}" />
+  <meta property="og:url" content="{html.escape(canonical)}" />
+  <meta property="og:image" content="{html.escape(og_img)}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{html.escape(title)}" />
+  <meta name="twitter:description" content="{html.escape(desc)}" />
+  <meta name="twitter:image" content="{html.escape(og_img)}" />
+  <script type="application/ld+json">{json_ld_str}</script>"""
+
+
+def render_favicon_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14" fill="#090d16"/>
+  <rect x="3" y="3" width="58" height="58" rx="12" fill="none" stroke="#1e293b" stroke-width="2"/>
+  <circle cx="48" cy="16" r="5" fill="#10b981"/>
+  <path d="M18 18v18c0 6.6 5.4 12 12 12s12-5.4 12-12V18" fill="none" stroke="#38bdf8" stroke-width="6" stroke-linecap="round"/>
+</svg>"""
+
+
+def render_og_image_svg(site: str = "portal") -> str:
+    cfg = _SEO_CONFIG.get(site, _SEO_CONFIG["portal"])
+    domain = cfg["canonical"].replace("https://", "").rstrip("/")
+    badge = cfg["badge"]
+    accent = cfg["accent"]
+    title_short = cfg["title"].split("—")[-1].strip() if "—" in cfg["title"] else cfg["title"]
+    if len(title_short) > 48:
+        title_short = title_short[:46] + "…"
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#090d16"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect x="44" y="44" width="1112" height="542" rx="22" fill="#0f1523" stroke="#1e293b" stroke-width="2"/>
+  <circle cx="96" cy="108" r="10" fill="#10b981"/>
+  <text x="122" y="115" fill="#e2e8f0" font-family="monospace" font-size="24" font-weight="700">{html.escape(domain)} // Ulaach Developer Platform</text>
+  <rect x="84" y="170" width="460" height="42" rx="8" fill="#070a12" stroke="{accent}" stroke-width="1.5"/>
+  <text x="104" y="197" fill="{accent}" font-family="monospace" font-size="18" font-weight="700">{html.escape(badge)}</text>
+  <text x="84" y="290" fill="#f8fafc" font-family="sans-serif" font-size="46" font-weight="700">{html.escape(title_short)}</text>
+  <text x="84" y="365" fill="#94a3b8" font-family="monospace" font-size="23">fx.ulaach.cc • weather.ulaach.cc • tool.ulaach.cc • util.ulaach.cc</text>
+  <rect x="84" y="445" width="1032" height="84" rx="12" fill="#070a12" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="112" y="495" fill="#34d399" font-family="monospace" font-size="22">GET /xansh.json   GET /weather.json   GET /insights.json   GET /num2words</text>
+</svg>"""
+
+
+def render_robots_txt(host: str) -> str:
+    clean_host = (host or "ulaach.cc").split(":")[0].lower()
+    if clean_host not in ("ulaach.cc", "fx.ulaach.cc", "weather.ulaach.cc", "tool.ulaach.cc", "util.ulaach.cc"):
+        clean_host = "ulaach.cc"
+    return (
+        "User-agent: *\n"
+        "Disallow: /health\n\n"
+        "User-agent: GPTBot\n"
+        "Disallow: /\n\n"
+        "User-agent: CCBot\n"
+        "Disallow: /\n\n"
+        f"Sitemap: https://{clean_host}/sitemap.xml\n"
+    )
+
+
+def render_sitemap_xml(host: str) -> str:
+    clean_host = (host or "ulaach.cc").split(":")[0].lower()
+    today_iso = datetime.datetime.now(UB_TZ).date().isoformat()
+
+    host_urls: dict[str, list[tuple[str, str, str]]] = {
+        "ulaach.cc": [
+            ("https://ulaach.cc/", "hourly", "1.0"),
+            ("https://fx.ulaach.cc/", "hourly", "0.9"),
+            ("https://weather.ulaach.cc/", "hourly", "0.9"),
+            ("https://tool.ulaach.cc/", "daily", "0.8"),
+            ("https://util.ulaach.cc/", "weekly", "0.8"),
+        ],
+        "fx.ulaach.cc": [
+            ("https://fx.ulaach.cc/", "hourly", "1.0"),
+            ("https://fx.ulaach.cc/xansh.json", "hourly", "0.9"),
+            ("https://fx.ulaach.cc/banks.json", "hourly", "0.9"),
+            ("https://fx.ulaach.cc/convert.json?from=USD&to=MNT&amount=100", "hourly", "0.8"),
+            ("https://fx.ulaach.cc/history.json?currency=USD&days=30", "daily", "0.8"),
+            ("https://fx.ulaach.cc/xansh.html?lang=MN&theme=dark", "daily", "0.8"),
+        ],
+        "weather.ulaach.cc": [
+            ("https://weather.ulaach.cc/", "hourly", "1.0"),
+            ("https://weather.ulaach.cc/weather.json", "hourly", "0.9"),
+            ("https://weather.ulaach.cc/insights.json", "hourly", "0.9"),
+            ("https://weather.ulaach.cc/aqi.json", "hourly", "0.9"),
+            ("https://weather.ulaach.cc/forecast.json?sid=292", "hourly", "0.8"),
+            ("https://weather.ulaach.cc/fire-risk.json", "daily", "0.8"),
+            ("https://weather.ulaach.cc/weather.html?sid=292&lang=MN&theme=dark", "hourly", "0.8"),
+        ],
+        "tool.ulaach.cc": [
+            ("https://tool.ulaach.cc/", "daily", "1.0"),
+            ("https://tool.ulaach.cc/json", "daily", "0.8"),
+            ("https://tool.ulaach.cc/headers", "daily", "0.7"),
+        ],
+        "util.ulaach.cc": [
+            ("https://util.ulaach.cc/", "weekly", "1.0"),
+            ("https://util.ulaach.cc/num2words?amount=1254800.50&currency=MNT", "weekly", "0.8"),
+            ("https://util.ulaach.cc/translit?text=Ulaanbaatar&dir=lat2cyr", "weekly", "0.8"),
+        ],
+    }
+
+    entries = host_urls.get(clean_host, host_urls["ulaach.cc"])
+    url_blocks = []
+    for loc, freq, prio in entries:
+        url_blocks.append(
+            f"  <url>\n"
+            f"    <loc>{html.escape(loc)}</loc>\n"
+            f"    <lastmod>{today_iso}</lastmod>\n"
+            f"    <changefreq>{freq}</changefreq>\n"
+            f"    <priority>{prio}</priority>\n"
+            f"  </url>"
+        )
+
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(url_blocks)
+        + "\n</urlset>\n"
+    )
+
+
 def _common_head(title: str, active_site: str) -> str:
     def _cls(s: str) -> str:
         return "nav-pill active" if s == active_site else "nav-pill"
+
+    seo_meta = build_seo_meta_html(active_site, title_override=title)
 
     return f"""<!DOCTYPE html>
 <html lang="mn">
@@ -855,6 +1093,7 @@ def _common_head(title: str, active_site: str) -> str:
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{html.escape(title)}</title>
+{seo_meta}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
