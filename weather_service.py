@@ -3355,7 +3355,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
 
       var xRenderer = am5xy.AxisRendererX.new(rootHm, {{
         visible: false,
-        minGridDistance: 10,
+        minGridDistance: 50,
         opposite: true
       }});
       xRenderer.grid.template.set('visible', false);
@@ -3365,13 +3365,15 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         fontFamily: 'JetBrains Mono, monospace',
         paddingBottom: 8
       }});
-      xRenderer.labels.template.adapters.add('text', function(text, target) {{
-        if (!text) return '';
-        var hNum = parseInt(String(text).split(':')[0], 10);
-        if (!isNaN(hNum) && (hNum % 2 !== 0)) {{
-          return '';
+      xRenderer.labels.template.adapters.add('forceHidden', function(forceHidden, target) {{
+        var di = target.dataItem;
+        if (di && di.dataContext && di.dataContext.hour) {{
+          var hNum = parseInt(String(di.dataContext.hour).split(':')[0], 10);
+          if (!isNaN(hNum) && (hNum % 2 !== 0)) {{
+            return true;
+          }}
         }}
-        return text;
+        return false;
       }});
 
       var xAxis = chartHm.xAxes.push(
