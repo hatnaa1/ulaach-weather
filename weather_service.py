@@ -3355,7 +3355,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
 
       var xRenderer = am5xy.AxisRendererX.new(rootHm, {{
         visible: false,
-        minGridDistance: 50,
+        minGridDistance: 30,
         opposite: true
       }});
       xRenderer.grid.template.set('visible', false);
@@ -3363,7 +3363,10 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         fill: am5.color(0xe2e8f0),
         fontSize: 12,
         fontFamily: 'JetBrains Mono, monospace',
-        paddingBottom: 8
+        paddingBottom: 8,
+        location: 0.5,
+        multiLocation: 0.5,
+        centerX: am5.p50
       }});
       xRenderer.labels.template.adapters.add('forceHidden', function(forceHidden, target) {{
         var di = target.dataItem;
