@@ -2900,36 +2900,37 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 01B. 21 Aimags 5-Day Day/Night Forecast Matrix + amCharts 5 Heat Map with Legend -->
+    <!-- 01B. 7-Day x 24-Hour Temperature Heat Map with Legend + 28 Stations Matrix -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">02</span> 21 Аймаг ба Улаанбаатарын Ирэх 5 Хоногийн Дулааны Зураглал (amCharts 5 Heat Map with Legend)</h2>
-        <span class="section-meta">amCharts 5 HeatLegend • GET /forecast.json?sid=... • 316 сум/станц</span>
+        <h2 class="section-title"><span class="step-badge">02</span> 7 Хоног × 24 Цагийн Цаг Агаарын Дулааны Зураглал (amCharts 5 Heat Map with Legend)</h2>
+        <span class="section-meta">amCharts 5 HeatLegend • GET /forecast.json?sid=292 • 28 Станцаар сонгох</span>
       </div>
       <div class="section-body">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-          <div class="mono muted" style="font-size:12px;">🌡️ УЛСЫН ХЭМЖЭЭНИЙ 28 ГОЛ СТАНЦЫН ИРЭХ 5 ХОНОГИЙН ДУЛААНЫ МАТРИЦ (HEAT MAP WITH LEGEND) • Нүдэн дээр хулгана ойртуулж дэлгэрэнгүй харна уу</div>
-          <div id="wx-hm-tabs" style="display:inline-flex;gap:6px;background:var(--bg-code);padding:4px;border-radius:8px;border:1px solid var(--border);">
-            <button type="button" class="wx-tab-btn active" data-hm="day" style="padding:5px 12px;border-radius:6px;border:1px solid transparent;background:rgba(56,189,248,0.16);color:#38bdf8;font-family:var(--mono);font-size:11.5px;font-weight:700;cursor:pointer;">☀️ Өдрийн хэм (Өдөр / Шөнө)</button>
-            <button type="button" class="wx-tab-btn" data-hm="night" style="padding:5px 12px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--muted);font-family:var(--mono);font-size:11.5px;font-weight:700;cursor:pointer;">🌙 Шөнийн доод хэм</button>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span class="mono bold" style="font-size:12.5px;color:#34d399;">📍 БАЙРШИЛ / СТАНЦ СОНГОХ:</span>
+            <select id="wx-hm-sid-sel" style="background:#090d16;border:1px solid var(--accent);color:#f8fafc;border-radius:8px;padding:6px 12px;font-family:var(--mono);font-size:12.5px;font-weight:700;cursor:pointer;">
+              {''.join(station_options)}
+            </select>
+            <span id="wx-hm-status" class="mono muted" style="font-size:11.5px;">Сүүлийн 7 хоногийн 24 цагийн (00:00 – 23:00) дулааны матриц • Хулгана ойртуулж харна уу</span>
           </div>
+          <a id="wx-hm-api-link" href="/forecast.json?sid=292" target="_blank" class="mono" style="font-size:11.5px;color:#38bdf8;">GET /forecast.json?sid=292 →</a>
         </div>
 
-        <div id="wx-heatmap-chart" style="width:100%;height:820px;background:rgba(7,10,18,0.75);border:1px solid var(--border);border-radius:10px;padding:8px;"></div>
+        <div id="wx-heatmap-chart" style="width:100%;height:420px;background:rgba(7,10,18,0.75);border:1px solid var(--border);border-radius:10px;padding:10px;"></div>
 
-        <div style="margin-top:20px;display:grid;grid-template-columns:1fr;gap:18px;">
-          <div style="background:rgba(7,10,18,0.75);border:1px solid var(--border);border-radius:10px;padding:14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-              <span class="mono bold" style="font-size:12.5px;color:#38bdf8;">📈 УЛААНБААТАР ХОТЫН ОЙРЫН 24–48 ЦАГИЙН ТЕМПЕРАТУР, МЭДРЭГДЭХ ХЭМ &amp; САЛХИНЫ ГРАФИК (amCharts 5)</span>
-              <span class="mono muted" style="font-size:11px;">wx.fore_3hours • 3 цаг тутмын нарийвчилсан муруй</span>
-            </div>
-            <div id="wx-ub3h-chart" style="width:100%;height:310px;"></div>
+        <div style="margin-top:18px;background:rgba(7,10,18,0.75);border:1px solid var(--border);border-radius:10px;padding:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <span id="wx-3h-title" class="mono bold" style="font-size:12.5px;color:#38bdf8;">📈 СОНГОСОН СТАНЦЫН ИРЭХ 24–48 ЦАГИЙН ТЕМПЕРАТУР &amp; МЭДРЭГДЭХ ХЭМИЙН МУРУЙ (amCharts 5)</span>
+            <span class="mono muted" style="font-size:11px;">wx.fore_3hours • 3 цаг тутмын нарийвчилсан прогноз</span>
           </div>
+          <div id="wx-ub3h-chart" style="width:100%;height:280px;"></div>
         </div>
 
-        <details style="margin-top:16px;">
-          <summary class="mono" style="cursor:pointer;font-size:12px;color:#38bdf8;padding:8px 12px;background:var(--bg-code);border:1px solid var(--border);border-radius:8px;">📋 28 Станцын 5 хоногийн Өдөр / Шөнийн тоон хүснэгтийг дэлгэж харах (Table View)</summary>
-          <div class="table-wrap" style="margin-top:10px;">
+        <div style="margin-top:20px;">
+          <div class="mono muted" style="font-size:12px;margin-bottom:10px;">📋 21 АЙМАГ БА УЛААНБААТАРЫН ИРЭХ 5 ХОНОГИЙН ӨДӨР (☀️ ШАР) / ШӨНИЙН (🌙 ЦЭНХЭР) ТААМГИЙН ХҮСНЭГТ</div>
+          <div class="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -2948,7 +2949,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
               </tbody>
             </table>
           </div>
-        </details>
+        </div>
       </div>
     </section>
 
@@ -3308,233 +3309,171 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
   <script src="https://cdn.amcharts.com/lib/5/themes/Dark.js"></script>
   <script>
     (function() {{
-      var hmRaw = {heatmap_json_str};
-      var ub3hRaw = {ub_3h_json_str};
       if (typeof am5 === 'undefined') return;
 
-      // 1. amCharts 5 Heat Map with Legend (28 Stations x 5 Days)
+      // 1. amCharts 5 Demo-style Heat Map with Legend (7 Days x 24 Hours, NO text inside cells, Tooltip + HeatLegend on hover)
       var hmEl = document.getElementById('wx-heatmap-chart');
-      if (hmEl && hmRaw && hmRaw.length) {{
-        var rootHm = am5.Root.new('wx-heatmap-chart');
-        rootHm.setThemes([am5themes_Animated.new(rootHm), am5themes_Dark.new(rootHm)]);
-
-        var chartHm = rootHm.container.children.push(
-          am5xy.XYChart.new(rootHm, {{
-            panX: false,
-            panY: false,
-            wheelX: 'none',
-            wheelY: 'none',
-            paddingLeft: 0,
-            paddingRight: 10,
-            layout: rootHm.verticalLayout
-          }})
-        );
-
-        var yRenderer = am5xy.AxisRendererY.new(rootHm, {{
-          visible: false,
-          minGridDistance: 16,
-          inversed: false
-        }});
-        yRenderer.grid.template.set('visible', false);
-        yRenderer.labels.template.setAll({{
-          fill: am5.color(0xe2e8f0),
-          fontSize: 11.5,
-          fontFamily: 'JetBrains Mono, monospace',
-          paddingRight: 8
-        }});
-
-        var yAxis = chartHm.yAxes.push(
-          am5xy.CategoryAxis.new(rootHm, {{
-            maxDeviation: 0,
-            renderer: yRenderer,
-            categoryField: 'station'
-          }})
-        );
-
-        var xRenderer = am5xy.AxisRendererX.new(rootHm, {{
-          visible: false,
-          minGridDistance: 30,
-          opposite: true
-        }});
-        xRenderer.grid.template.set('visible', false);
-        xRenderer.labels.template.setAll({{
-          fill: am5.color(0x38bdf8),
-          fontSize: 12,
-          fontWeight: '700',
-          fontFamily: 'JetBrains Mono, monospace',
-          paddingBottom: 6
-        }});
-
-        var xAxis = chartHm.xAxes.push(
-          am5xy.CategoryAxis.new(rootHm, {{
-            renderer: xRenderer,
-            categoryField: 'day'
-          }})
-        );
-
-        var hmTooltip = am5.Tooltip.new(rootHm, {{
-          autoTextColor: false,
-          getFillFromSprite: false,
-          pointerOrientation: 'horizontal',
-          labelText: '[bold #38bdf8]{{station}} (SID={{sid}})[/]\\n[#94a3b8]Огноо:[/] [bold #ffffff]{{date}} — {{day}}[/]\\n[#94a3b8]Өдөртөө:[/] [bold #fbbf24]{{temp_day}}°C[/] [#94a3b8](мэдрэгдэх {{feels_day}}°C, {{cond_day}}, {{wind_day}} м/с)[/]\\n[#94a3b8]Шөнөдөө:[/] [bold #38bdf8]{{temp_night}}°C[/] [#94a3b8](мэдрэгдэх {{feels_night}}°C, {{cond_night}}, {{wind_night}} м/с)[/]'
-        }});
-        hmTooltip.get('background').setAll({{
-          fill: am5.color(0x090d16),
-          fillOpacity: 0.96,
-          stroke: am5.color(0x38bdf8),
-          strokeWidth: 1.5,
-          cornerRadius: 8
-        }});
-        hmTooltip.label.setAll({{
-          fill: am5.color(0xf8fafc),
-          fontSize: 12,
-          fontFamily: 'JetBrains Mono, monospace'
-        }});
-
-        var seriesHm = chartHm.series.push(
-          am5xy.ColumnSeries.new(rootHm, {{
-            calculateAggregates: true,
-            stroke: am5.color(0x090d16),
-            clustered: false,
-            xAxis: xAxis,
-            yAxis: yAxis,
-            categoryXField: 'day',
-            categoryYField: 'station',
-            valueField: 'value',
-            tooltip: hmTooltip
-          }})
-        );
-
-        seriesHm.columns.template.setAll({{
-          tooltipText: '{{station}}',
-          strokeOpacity: 1,
-          strokeWidth: 2,
-          stroke: am5.color(0x090d16),
-          width: am5.percent(100),
-          height: am5.percent(100),
-          cornerRadiusTL: 5,
-          cornerRadiusTR: 5,
-          cornerRadiusBL: 5,
-          cornerRadiusBR: 5
-        }});
-
-        var cellLabelField = 'label_both';
-        seriesHm.bullets.push(function() {{
-          return am5.Bullet.new(rootHm, {{
-            sprite: am5.Label.new(rootHm, {{
-              fill: am5.color(0xffffff),
-              populateText: true,
-              centerX: am5.p50,
-              centerY: am5.p50,
-              fontSize: 11.5,
-              fontWeight: '700',
-              fontFamily: 'JetBrains Mono, monospace',
-              text: '{{label_cell}}'
-            }})
-          }});
-        }});
-
-        seriesHm.set('heatRules', [{{
-          target: seriesHm.columns.template,
-          min: am5.color(0x1d4ed8),
-          max: am5.color(0xf59e0b),
-          dataField: 'value',
-          key: 'fill'
-        }}]);
-
-        var heatLegend = chartHm.bottomAxesContainer.children.push(
-          am5.HeatLegend.new(rootHm, {{
-            orientation: 'horizontal',
-            endColor: am5.color(0xf59e0b),
-            startColor: am5.color(0x1d4ed8),
-            stepCount: 10,
-            paddingTop: 12
-          }})
-        );
-        heatLegend.startLabel.setAll({{
-          fontSize: 11.5,
-          fill: am5.color(0x38bdf8),
-          fontFamily: 'JetBrains Mono, monospace'
-        }});
-        heatLegend.endLabel.setAll({{
-          fontSize: 11.5,
-          fill: am5.color(0xfbbf24),
-          fontFamily: 'JetBrains Mono, monospace'
-        }});
-
-        seriesHm.columns.template.events.on('pointerover', function(ev) {{
-          var di = ev.target.dataItem;
-          if (di) {{
-            heatLegend.showValue(di.get('value', 0));
-          }}
-        }});
-
-        var stationsSet = [];
-        var daysSet = [];
-        hmRaw.forEach(function(it) {{
-          if (stationsSet.indexOf(it.station) === -1) stationsSet.push(it.station);
-          if (daysSet.indexOf(it.day) === -1) daysSet.push(it.day);
-        }});
-        yAxis.data.setAll(stationsSet.map(function(s) {{ return {{ station: s }}; }}));
-        xAxis.data.setAll(daysSet.map(function(d) {{ return {{ day: d }}; }}));
-
-        function applyHmMode(mode) {{
-          var mapped = hmRaw.map(function(it) {{
-            var v = mode === 'night' ? it.temp_night : it.temp_day;
-            var lc = mode === 'night' ? (it.label_night + ' (☀️' + it.label_day + ')') : it.label_both;
-            return Object.assign({{}}, it, {{
-              value: v !== null && v !== undefined ? v : -5,
-              label_cell: lc
-            }});
-          }});
-          if (mode === 'night') {{
-            seriesHm.set('heatRules', [{{
-              target: seriesHm.columns.template,
-              min: am5.color(0x1e3a8a),
-              max: am5.color(0x06b6d4),
-              dataField: 'value',
-              key: 'fill'
-            }}]);
-            heatLegend.set('startColor', am5.color(0x1e3a8a));
-            heatLegend.set('endColor', am5.color(0x06b6d4));
-          }} else {{
-            seriesHm.set('heatRules', [{{
-              target: seriesHm.columns.template,
-              min: am5.color(0x0284c7),
-              max: am5.color(0xd97706),
-              dataField: 'value',
-              key: 'fill'
-            }}]);
-            heatLegend.set('startColor', am5.color(0x0284c7));
-            heatLegend.set('endColor', am5.color(0xd97706));
-          }}
-          seriesHm.data.setAll(mapped);
-        }}
-
-        seriesHm.events.on('datavalidated', function() {{
-          heatLegend.set('startValue', seriesHm.getPrivate('valueLow'));
-          heatLegend.set('endValue', seriesHm.getPrivate('valueHigh'));
-        }});
-
-        applyHmMode('day');
-
-        document.querySelectorAll('#wx-hm-tabs button').forEach(function(btn) {{
-          btn.addEventListener('click', function() {{
-            document.querySelectorAll('#wx-hm-tabs button').forEach(function(b) {{
-              b.style.background = 'transparent';
-              b.style.color = '#94a3b8';
-            }});
-            btn.style.background = 'rgba(56,189,248,0.16)';
-            btn.style.color = '#38bdf8';
-            applyHmMode(btn.getAttribute('data-hm'));
-          }});
-        }});
-      }}
-
-      // 2. amCharts 5 UB 3-Hour Temperature, Feels-Like & Wind Curve
       var ub3hEl = document.getElementById('wx-ub3h-chart');
-      if (ub3hEl && ub3hRaw && ub3hRaw.length) {{
-        var root3h = am5.Root.new('wx-ub3h-chart');
+      if (!hmEl) return;
+
+      var rootHm = am5.Root.new('wx-heatmap-chart');
+      rootHm.setThemes([am5themes_Animated.new(rootHm), am5themes_Dark.new(rootHm)]);
+
+      var chartHm = rootHm.container.children.push(
+        am5xy.XYChart.new(rootHm, {{
+          panX: false,
+          panY: false,
+          wheelX: 'none',
+          wheelY: 'none',
+          paddingLeft: 0,
+          paddingRight: 10,
+          layout: rootHm.verticalLayout
+        }})
+      );
+
+      var yRenderer = am5xy.AxisRendererY.new(rootHm, {{
+        visible: false,
+        minGridDistance: 20,
+        inversed: true
+      }});
+      yRenderer.grid.template.set('visible', false);
+      yRenderer.labels.template.setAll({{
+        fill: am5.color(0xe2e8f0),
+        fontSize: 12,
+        fontWeight: '600',
+        fontFamily: 'JetBrains Mono, monospace',
+        paddingRight: 10
+      }});
+
+      var yAxis = chartHm.yAxes.push(
+        am5xy.CategoryAxis.new(rootHm, {{
+          maxDeviation: 0,
+          renderer: yRenderer,
+          categoryField: 'day'
+        }})
+      );
+
+      var xRenderer = am5xy.AxisRendererX.new(rootHm, {{
+        visible: false,
+        minGridDistance: 24,
+        opposite: true
+      }});
+      xRenderer.grid.template.set('visible', false);
+      xRenderer.labels.template.setAll({{
+        fill: am5.color(0x94a3b8),
+        fontSize: 11,
+        fontFamily: 'JetBrains Mono, monospace',
+        paddingBottom: 6
+      }});
+
+      var xAxis = chartHm.xAxes.push(
+        am5xy.CategoryAxis.new(rootHm, {{
+          renderer: xRenderer,
+          categoryField: 'hour'
+        }})
+      );
+
+      var hmTooltip = am5.Tooltip.new(rootHm, {{
+        autoTextColor: false,
+        getFillFromSprite: false,
+        pointerOrientation: 'vertical',
+        labelText: '[bold #38bdf8]{{stationName}} — {{date}} {{hour}}[/]\\n[#94a3b8]Температур:[/] [bold #fbbf24]{{value}}°C[/] [#94a3b8](Мэдрэгдэх: {{feels_c}}°C)[/]\\n[#94a3b8]Чийгшил / Салхи:[/] [bold #ffffff]{{humidity_pct}}% • {{wind_ms}} м/с[/]\\n[#94a3b8]Төлөв:[/] [bold #34d399]{{condition}}[/]'
+      }});
+      hmTooltip.get('background').setAll({{
+        fill: am5.color(0x090d16),
+        fillOpacity: 0.96,
+        stroke: am5.color(0x38bdf8),
+        strokeWidth: 1.5,
+        cornerRadius: 8
+      }});
+      hmTooltip.label.setAll({{
+        fill: am5.color(0xf8fafc),
+        fontSize: 12,
+        fontFamily: 'JetBrains Mono, monospace'
+      }});
+
+      var seriesHm = chartHm.series.push(
+        am5xy.ColumnSeries.new(rootHm, {{
+          calculateAggregates: true,
+          stroke: am5.color(0x090d16),
+          clustered: false,
+          xAxis: xAxis,
+          yAxis: yAxis,
+          categoryXField: 'hour',
+          categoryYField: 'day',
+          valueField: 'value',
+          tooltip: hmTooltip
+        }})
+      );
+
+      // Clean demo-style cells: NO text bullets inside cells, rounded corners, dark gap border
+      seriesHm.columns.template.setAll({{
+        tooltipY: am5.percent(20),
+        strokeOpacity: 1,
+        strokeWidth: 2,
+        stroke: am5.color(0x090d16),
+        cornerRadiusTL: 5,
+        cornerRadiusTR: 5,
+        cornerRadiusBL: 5,
+        cornerRadiusBR: 5,
+        width: am5.percent(100),
+        height: am5.percent(100)
+      }});
+
+      seriesHm.set('heatRules', [{{
+        target: seriesHm.columns.template,
+        min: am5.color(0x0284c7),
+        max: am5.color(0xf59e0b),
+        dataField: 'value',
+        key: 'fill'
+      }}]);
+
+      var heatLegend = chartHm.bottomAxesContainer.children.push(
+        am5.HeatLegend.new(rootHm, {{
+          orientation: 'horizontal',
+          startColor: am5.color(0x0284c7),
+          endColor: am5.color(0xf59e0b),
+          stepCount: 10,
+          paddingTop: 14
+        }})
+      );
+      heatLegend.startLabel.setAll({{
+        fontSize: 12,
+        fill: am5.color(0x38bdf8),
+        fontWeight: '700',
+        fontFamily: 'JetBrains Mono, monospace'
+      }});
+      heatLegend.endLabel.setAll({{
+        fontSize: 12,
+        fill: am5.color(0xfbbf24),
+        fontWeight: '700',
+        fontFamily: 'JetBrains Mono, monospace'
+      }});
+
+      seriesHm.columns.template.events.on('pointerover', function(ev) {{
+        var di = ev.target.dataItem;
+        if (di) {{
+          heatLegend.showValue(di.get('value', 0));
+        }}
+      }});
+
+      seriesHm.events.on('datavalidated', function() {{
+        var lo = seriesHm.getPrivate('valueLow');
+        var hi = seriesHm.getPrivate('valueHigh');
+        heatLegend.set('startValue', lo);
+        heatLegend.set('endValue', hi);
+        heatLegend.set('startText', (lo !== undefined ? lo : '') + '°C (Хүйтэн)');
+        heatLegend.set('endText', (hi !== undefined ? '+' + hi : '').replace('+-', '-') + '°C (Дулаан)');
+      }});
+
+      // 2. amCharts 5 Selected Station 3-Hour Forecast Curve
+      var root3h = null;
+      var xAxis3 = null;
+      var sTemp = null;
+      var sFeels = null;
+
+      if (ub3hEl) {{
+        root3h = am5.Root.new('wx-ub3h-chart');
         root3h.setThemes([am5themes_Animated.new(root3h), am5themes_Dark.new(root3h)]);
 
         var chart3h = root3h.container.children.push(
@@ -3548,7 +3487,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
 
         var xR3 = am5xy.AxisRendererX.new(root3h, {{ minGridDistance: 35 }});
         xR3.labels.template.setAll({{ fill: am5.color(0x94a3b8), fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }});
-        var xAxis3 = chart3h.xAxes.push(am5xy.CategoryAxis.new(root3h, {{ categoryField: 'time_ub', renderer: xR3 }}));
+        xAxis3 = chart3h.xAxes.push(am5xy.CategoryAxis.new(root3h, {{ categoryField: 'time_short', renderer: xR3 }}));
 
         var yR3 = am5xy.AxisRendererY.new(root3h, {{}});
         yR3.labels.template.setAll({{ fill: am5.color(0x94a3b8), fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }});
@@ -3557,7 +3496,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         var tip3 = am5.Tooltip.new(root3h, {{
           autoTextColor: false,
           getFillFromSprite: false,
-          labelText: '[bold #38bdf8]Улаанбаатар — {{time_ub}}[/]\\n[#94a3b8]Температур:[/] [bold #fbbf24]{{temp_c}}°C[/] [#94a3b8](Мэдрэгдэх: {{feels_c}}°C)[/]\\n[#94a3b8]Төлөв / Салхи:[/] [bold #34d399]{{condition}} • {{wind_ms}} м/с[/]'
+          labelText: '[bold #38bdf8]{{stationName}} — {{time_short}}[/]\\n[#94a3b8]Температур:[/] [bold #fbbf24]{{temp_c}}°C[/] [#94a3b8](Мэдрэгдэх: {{feels_c}}°C)[/]\\n[#94a3b8]Төлөв / Салхи:[/] [bold #34d399]{{condition}} • {{wind_ms}} м/с[/]'
         }});
         tip3.get('background').setAll({{
           fill: am5.color(0x090d16),
@@ -3568,13 +3507,13 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         }});
         tip3.label.setAll({{ fill: am5.color(0xf8fafc), fontSize: 12, fontFamily: 'JetBrains Mono, monospace' }});
 
-        var sTemp = chart3h.series.push(
+        sTemp = chart3h.series.push(
           am5xy.SmoothedXLineSeries.new(root3h, {{
             name: 'Агаарын хэм (°C)',
             xAxis: xAxis3,
             yAxis: yAxis3,
             valueYField: 'temp_c',
-            categoryXField: 'time_ub',
+            categoryXField: 'time_short',
             stroke: am5.color(0xfbbf24),
             fill: am5.color(0xfbbf24),
             tooltip: tip3
@@ -3588,13 +3527,13 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
           }});
         }});
 
-        var sFeels = chart3h.series.push(
+        sFeels = chart3h.series.push(
           am5xy.SmoothedXLineSeries.new(root3h, {{
             name: 'Мэдрэгдэх хэм (°C)',
             xAxis: xAxis3,
             yAxis: yAxis3,
             valueYField: 'feels_c',
-            categoryXField: 'time_ub',
+            categoryXField: 'time_short',
             stroke: am5.color(0x38bdf8)
           }})
         );
@@ -3602,11 +3541,60 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
 
         var cursor3 = chart3h.set('cursor', am5xy.XYCursor.new(root3h, {{ behavior: 'none', xAxis: xAxis3 }}));
         cursor3.lineY.set('visible', false);
-
-        xAxis3.data.setAll(ub3hRaw);
-        sTemp.data.setAll(ub3hRaw);
-        sFeels.data.setAll(ub3hRaw);
       }}
+
+      async function loadStationHeatmap(sid) {{
+        var statusEl = document.getElementById('wx-hm-status');
+        var apiLink = document.getElementById('wx-hm-api-link');
+        var title3h = document.getElementById('wx-3h-title');
+        if (apiLink) {{
+          apiLink.href = '/forecast.json?sid=' + sid;
+          apiLink.textContent = 'GET /forecast.json?sid=' + sid + ' →';
+        }}
+        if (statusEl) statusEl.textContent = 'Ачаалж байна (sid=' + sid + ')...';
+        try {{
+          var res = await fetch('/forecast.json?sid=' + encodeURIComponent(sid));
+          var d = await res.json();
+          var stName = (d.station || d.sum || 'Станц') + (d.aimag ? ' (' + d.aimag + ')' : '');
+          var daysArr = d.heatmap_days || [];
+          var hoursArr = d.heatmap_hours || [];
+          var cellsArr = (d.heatmap_7d_24h || []).map(function(c) {{
+            return Object.assign({{}}, c, {{ stationName: stName }});
+          }});
+
+          yAxis.data.setAll(daysArr.map(function(dy) {{ return {{ day: dy }}; }}));
+          xAxis.data.setAll(hoursArr.map(function(hr) {{ return {{ hour: hr }}; }}));
+          seriesHm.data.setAll(cellsArr);
+
+          if (statusEl) {{
+            statusEl.textContent = stName + ' • Сүүлийн 7 хоног × 24 цагийн (' + cellsArr.length + ' цагийн нүд) дулааны зураглал';
+          }}
+
+          if (xAxis3 && sTemp && sFeels) {{
+            var h3 = (d.hourly_3h || []).map(function(item) {{
+              var ts = item.time ? item.time.slice(5, 16) : '';
+              return Object.assign({{}}, item, {{ time_short: ts, stationName: stName }});
+            }});
+            xAxis3.data.setAll(h3);
+            sTemp.data.setAll(h3);
+            sFeels.data.setAll(h3);
+            if (title3h) {{
+              title3h.textContent = '📈 ' + stName.toUpperCase() + ' — ИРЭХ 24–48 ЦАГИЙН ТЕМПЕРАТУР & МЭДРЭГДЭХ ХЭМИЙН МУРУЙ (amCharts 5)';
+            }}
+          }}
+        }} catch (err) {{
+          if (statusEl) statusEl.textContent = 'Өгөгдөл татахад алдаа гарлаа: ' + err;
+        }}
+      }}
+
+      var hmSel = document.getElementById('wx-hm-sid-sel');
+      if (hmSel) {{
+        hmSel.addEventListener('change', function() {{
+          loadStationHeatmap(hmSel.value);
+        }});
+      }}
+
+      loadStationHeatmap('292');
     }})();
   </script>
 </body>
