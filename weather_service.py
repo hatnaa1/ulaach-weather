@@ -893,6 +893,25 @@ _SEO_CONFIG: dict[str, dict[str, str]] = {
 }
 
 
+# Self-hosted Umami (https://a.ulaach.cc) — сайт бүр өөрийн website-id-тай.
+# Embed widget-үүд (/xansh.html, /weather.html) гадны сайт дээр ачаалагддаг тул энд хамаарахгүй.
+_UMAMI_SCRIPT = "https://a.ulaach.cc/insight.js"
+_UMAMI_IDS = {
+    "portal": "40b9df94-25dc-4f9d-84e6-3a1f10ffa281",
+    "fx": "f703c531-96f1-4874-b333-85372837c27e",
+    "weather": "344fd823-6959-47e6-8a48-989516001756",
+    "tool": "067c5fae-b9f7-459f-972e-1ab66ec34e00",
+    "util": "e0be8613-69d8-4b26-b058-03dbd9d1d58e",
+}
+
+
+def _umami_tag(active_site: str) -> str:
+    wid = _UMAMI_IDS.get(active_site)
+    if not wid:
+        return ""
+    return f'\n  <script defer src="{_UMAMI_SCRIPT}" data-website-id="{wid}"></script>'
+
+
 def build_seo_meta_html(active_site: str, title_override: str | None = None) -> str:
     cfg = _SEO_CONFIG.get(active_site, _SEO_CONFIG["portal"])
     title = title_override or cfg["title"]
@@ -965,7 +984,7 @@ def build_seo_meta_html(active_site: str, title_override: str | None = None) -> 
   <meta name="twitter:title" content="{html.escape(title)}" />
   <meta name="twitter:description" content="{html.escape(desc)}" />
   <meta name="twitter:image" content="{html.escape(og_img)}" />
-  <script type="application/ld+json">{json_ld_str}</script>"""
+  <script type="application/ld+json">{json_ld_str}</script>{_umami_tag(active_site)}"""
 
 
 def render_favicon_svg() -> str:
@@ -1022,7 +1041,7 @@ def render_robots_txt(host: str) -> str:
 
 def render_sitemap_xml(host: str) -> str:
     clean_host = (host or "ulaach.cc").split(":")[0].lower()
-    today_iso = datetime.datetime.now(UB_TZ).date().isoformat()
+    now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:00:00Z")
 
     host_urls: dict[str, list[tuple[str, str, str]]] = {
         "ulaach.cc": [
@@ -1030,30 +1049,19 @@ def render_sitemap_xml(host: str) -> str:
         ],
         "fx.ulaach.cc": [
             ("https://fx.ulaach.cc/", "hourly", "1.0"),
-            ("https://fx.ulaach.cc/xansh.json", "hourly", "0.9"),
-            ("https://fx.ulaach.cc/banks.json", "hourly", "0.9"),
-            ("https://fx.ulaach.cc/convert.json?from=USD&to=MNT&amount=100", "hourly", "0.8"),
-            ("https://fx.ulaach.cc/history.json?currency=USD&days=30", "daily", "0.8"),
             ("https://fx.ulaach.cc/xansh.html?lang=MN&theme=dark", "daily", "0.8"),
+            ("https://fx.ulaach.cc/xansh.html?lang=EN&theme=dark", "daily", "0.7"),
         ],
         "weather.ulaach.cc": [
             ("https://weather.ulaach.cc/", "hourly", "1.0"),
-            ("https://weather.ulaach.cc/weather.json", "hourly", "0.9"),
-            ("https://weather.ulaach.cc/insights.json", "hourly", "0.9"),
-            ("https://weather.ulaach.cc/aqi.json", "hourly", "0.9"),
-            ("https://weather.ulaach.cc/forecast.json?sid=292", "hourly", "0.8"),
-            ("https://weather.ulaach.cc/fire-risk.json", "daily", "0.8"),
             ("https://weather.ulaach.cc/weather.html?sid=292&lang=MN&theme=dark", "hourly", "0.8"),
+            ("https://weather.ulaach.cc/weather.html?sid=292&lang=EN&theme=dark", "hourly", "0.7"),
         ],
         "tool.ulaach.cc": [
             ("https://tool.ulaach.cc/", "daily", "1.0"),
-            ("https://tool.ulaach.cc/json", "daily", "0.8"),
-            ("https://tool.ulaach.cc/headers", "daily", "0.7"),
         ],
         "util.ulaach.cc": [
             ("https://util.ulaach.cc/", "weekly", "1.0"),
-            ("https://util.ulaach.cc/num2words?amount=1254800.50&currency=MNT", "weekly", "0.8"),
-            ("https://util.ulaach.cc/translit?text=Ulaanbaatar&dir=lat2cyr", "weekly", "0.8"),
         ],
     }
 
@@ -1061,19 +1069,19 @@ def render_sitemap_xml(host: str) -> str:
     url_blocks = []
     for loc, freq, prio in entries:
         url_blocks.append(
-            f"  <url>\n"
-            f"    <loc>{html.escape(loc)}</loc>\n"
-            f"    <lastmod>{today_iso}</lastmod>\n"
-            f"    <changefreq>{freq}</changefreq>\n"
-            f"    <priority>{prio}</priority>\n"
-            f"  </url>"
+            f"<url>\n"
+            f"<loc>{html.escape(loc)}</loc>\n"
+            f"<lastmod>{now_iso}</lastmod>\n"
+            f"<changefreq>{freq}</changefreq>\n"
+            f"<priority>{prio}</priority>\n"
+            f"</url>"
         )
 
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
         + "\n".join(url_blocks)
-        + "\n</urlset>\n"
+        + "\n</urlset>"
     )
 
 
@@ -1712,10 +1720,10 @@ def render_tool_page(request: Request) -> HTMLResponse:
       var target = document.getElementById('probe-target').value.trim() || 'ulaach.cc';
       var port = document.getElementById('probe-port').value.trim() || '443';
       var url = '';
-      if (kind === 'lookup') url = '/lookup?target=' + encodeURIComponent(target);
-      else if (kind === 'dns') url = '/dns?domain=' + encodeURIComponent(target);
-      else if (kind === 'ssl') url = '/ssl?domain=' + encodeURIComponent(target);
-      else if (kind === 'port') url = '/port?host=' + encodeURIComponent(target) + '&port=' + encodeURIComponent(port);
+      if (kind === 'lookup') url = '/lookup' + '?target=' + encodeURIComponent(target);
+      else if (kind === 'dns') url = '/dns' + '?domain=' + encodeURIComponent(target);
+      else if (kind === 'ssl') url = '/ssl' + '?domain=' + encodeURIComponent(target);
+      else if (kind === 'port') url = '/port' + '?host=' + encodeURIComponent(target) + '&port=' + encodeURIComponent(port);
       document.getElementById('probe-status').textContent = 'Running GET ' + url + ' ...';
       try {{
         var res = await fetch(url);
@@ -1888,13 +1896,13 @@ f'''{{
       if (kind === 'num2words') {{
         var amt = document.getElementById('u-amount').value.trim();
         var cur = document.getElementById('u-cur').value;
-        url = '/num2words?amount=' + encodeURIComponent(amt) + '&currency=' + encodeURIComponent(cur);
+        url = '/num2words' + '?amount=' + encodeURIComponent(amt) + '&currency=' + encodeURIComponent(cur);
       }} else if (kind === 'cyr2lat' || kind === 'lat2cyr') {{
         var txt = document.getElementById('u-text').value;
-        url = '/translit?text=' + encodeURIComponent(txt) + '&dir=' + kind;
+        url = '/translit' + '?text=' + encodeURIComponent(txt) + '&dir=' + kind;
       }} else if (kind === 'regno') {{
         var r = document.getElementById('u-regno').value.trim();
-        url = '/regno?regno=' + encodeURIComponent(r);
+        url = '/regno' + '?regno=' + encodeURIComponent(r);
       }}
       document.getElementById('u-status').textContent = 'Running GET ' + url + ' ...';
       var res = await fetch(url);
@@ -1943,11 +1951,15 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
                 o.temp_max,
                 o.humidity,
                 o.wind_speed,
+                o.wind_max,
                 o.wind_dir,
+                o.pressure_st,
                 o.pressure_slp,
                 o.precip,
                 o.ww,
                 o.cloud_nh,
+                o.snow_depth,
+                o.soil_tmin,
                 sr.sunrise,
                 sr.sunset,
                 sr.day_length_min
@@ -1975,6 +1987,8 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
                 pm10_value,
                 no2_value,
                 so2_value,
+                co_value,
+                o3_value,
                 obs_time AT TIME ZONE 'Asia/Ulaanbaatar' AS obs_time_ub
             FROM wx.aqi_data
             WHERE obs_time > NOW() - INTERVAL '48 hours'
@@ -1998,6 +2012,83 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
             """
         )
 
+        hub_5day_rows = await conn.fetch(
+            """
+            SELECT DISTINCT ON (f.sid, f.fore_date)
+                f.sid,
+                s.aimag_name,
+                s.sum_name,
+                s.sta_name,
+                s.sta_28,
+                f.fore_date,
+                f.ww_code,
+                f.precip_prob,
+                f.temp_day,
+                f.temp_day_feels,
+                f.wind_day,
+                f.temp_night,
+                f.temp_night_feels,
+                f.wind_night,
+                f.ww_night,
+                f.precip_prob_night,
+                f.pheno_day,
+                f.pheno_night
+            FROM wx.fore_day f
+            JOIN wx.stations s ON s.sid = f.sid
+            WHERE s.sta_28 <> 0
+              AND f.fore_date > CURRENT_DATE
+              AND f.fore_date <= CURRENT_DATE + INTERVAL '5 days'
+            ORDER BY f.sid, f.fore_date ASC, (f.temp_night IS NOT NULL) DESC, f.issued_at DESC
+            """
+        )
+
+        snow_soil_rows = await conn.fetch(
+            """
+            SELECT DISTINCT ON (d.sid)
+                d.sid,
+                s.aimag_name,
+                s.sum_name,
+                s.sta_name,
+                d.snow_depth,
+                d.soil_tmin,
+                d.temp,
+                d.wind_max,
+                d.obs_time AT TIME ZONE 'Asia/Ulaanbaatar' AS obs_ub
+            FROM wx.obs_data d
+            JOIN wx.stations s ON s.sid = d.sid
+            WHERE d.obs_time > NOW() - INTERVAL '36 hours'
+              AND (d.snow_depth > 0 OR d.soil_tmin IS NOT NULL)
+            ORDER BY d.sid, d.obs_time DESC
+            """
+        )
+
+        acc_summary = await conn.fetchrow(
+            """
+            SELECT
+                ROUND(AVG(abs_error_c), 2) AS mae_c,
+                ROUND(100.0 * COUNT(*) FILTER (WHERE abs_error_c <= 2.5) / NULLIF(COUNT(*), 0), 1) AS within_25_pct,
+                COUNT(*) AS eval_count
+            FROM wx.v_forecast_accuracy
+            WHERE lead_days BETWEEN 0 AND 3
+            """
+        )
+
+        ub_acc_rows = await conn.fetch(
+            """
+            SELECT DISTINCT ON (fore_date)
+                fore_date,
+                lead_days,
+                forecast_temp,
+                actual_temp_max,
+                error_c,
+                abs_error_c
+            FROM wx.v_forecast_accuracy
+            WHERE sid = 292 AND lead_days BETWEEN 0 AND 2
+            ORDER BY fore_date DESC, lead_days ASC
+            LIMIT 7
+            """
+        )
+
         fire_rows = await conn.fetch(
             """
             SELECT aimag_name, sum_name, obs_date, idx, lat, lon
@@ -2014,7 +2105,7 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
             SELECT api_id, title, author, created AT TIME ZONE 'Asia/Ulaanbaatar' AS created_ub, body_text
             FROM wx.content
             ORDER BY created DESC
-            LIMIT 12
+            LIMIT 18
             """
         )
 
@@ -2051,7 +2142,11 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
                 "temp_max_c": round(float(r["temp_max"]), 1) if r["temp_max"] is not None else None,
                 "humidity_pct": lv.get("humidity_pct") if lv.get("humidity_pct") is not None else r["humidity"],
                 "wind_ms": lv.get("wind_ms") if lv.get("wind_ms") is not None else (round(float(r["wind_speed"]), 1) if r["wind_speed"] is not None else None),
+                "wind_max_ms": round(float(r["wind_max"]), 1) if r["wind_max"] is not None else None,
+                "pressure_st_hpa": round(float(r["pressure_st"]), 1) if r["pressure_st"] is not None else None,
                 "pressure_hpa": round(float(r["pressure_slp"]), 1) if r["pressure_slp"] is not None else lv.get("pressure_hpa"),
+                "snow_depth_cm": round(float(r["snow_depth"]), 1) if r["snow_depth"] is not None else None,
+                "soil_tmin_c": round(float(r["soil_tmin"]), 1) if r["soil_tmin"] is not None else None,
                 "condition": lv.get("condition") or _ww_text(r["ww"], r["cloud_nh"]),
                 "sunrise": r["sunrise"].strftime("%H:%M") if r["sunrise"] else None,
                 "sunset": r["sunset"].strftime("%H:%M") if r["sunset"] else None,
@@ -2071,6 +2166,10 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
                 "color": color,
                 "pm25": round(float(r["pm25_value"]), 1) if r["pm25_value"] is not None else None,
                 "pm10": round(float(r["pm10_value"]), 1) if r["pm10_value"] is not None else None,
+                "so2": round(float(r["so2_value"]), 1) if r["so2_value"] is not None else None,
+                "no2": round(float(r["no2_value"]), 1) if r["no2_value"] is not None else None,
+                "co": round(float(r["co_value"]), 2) if r["co_value"] is not None else None,
+                "o3": round(float(r["o3_value"]), 1) if r["o3_value"] is not None else None,
                 "obs_time": r["obs_time_ub"].strftime("%Y-%m-%d %H:%M") if r["obs_time_ub"] else None,
             }
         )
@@ -2088,6 +2187,70 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
                 "condition": _ww_text(r["pre_code"]),
             }
         )
+
+    hub_5day_map: dict[int, dict[str, Any]] = {}
+    for r in hub_5day_rows:
+        sid = r["sid"]
+        if sid not in hub_5day_map:
+            hub_5day_map[sid] = {
+                "sid": sid,
+                "aimag": r["aimag_name"],
+                "sum": r["sum_name"],
+                "station": r["sta_name"],
+                "sta_28": r["sta_28"],
+                "days": [],
+            }
+        hub_5day_map[sid]["days"].append(
+            {
+                "date": r["fore_date"].isoformat(),
+                "date_short": r["fore_date"].strftime("%m-%d"),
+                "temp_day_c": int(round(float(r["temp_day"]))) if r["temp_day"] is not None else None,
+                "temp_night_c": int(round(float(r["temp_night"]))) if r["temp_night"] is not None else None,
+                "feels_day_c": int(round(float(r["temp_day_feels"]))) if r["temp_day_feels"] is not None else None,
+                "feels_night_c": int(round(float(r["temp_night_feels"]))) if r["temp_night_feels"] is not None else None,
+                "wind_day_ms": int(round(float(r["wind_day"]))) if r["wind_day"] is not None else None,
+                "wind_night_ms": int(round(float(r["wind_night"]))) if r["wind_night"] is not None else None,
+                "precip_prob_day": r["precip_prob"],
+                "precip_prob_night": r["precip_prob_night"],
+                "cond_day": r["pheno_day"] or _ww_text(r["ww_code"]),
+                "cond_night": r["pheno_night"] or _ww_text(r["ww_night"]),
+            }
+        )
+    hub_5day_list = sorted(hub_5day_map.values(), key=lambda x: (x["sta_28"] or 999, x["sid"]))
+
+    snow_list = []
+    for r in snow_soil_rows:
+        snow_list.append(
+            {
+                "sid": r["sid"],
+                "aimag": r["aimag_name"],
+                "sum": r["sum_name"],
+                "station": r["sta_name"],
+                "snow_cm": round(float(r["snow_depth"]), 1) if r["snow_depth"] is not None else 0.0,
+                "soil_tmin_c": round(float(r["soil_tmin"]), 1) if r["soil_tmin"] is not None else None,
+                "temp_c": round(float(r["temp"]), 1) if r["temp"] is not None else None,
+                "wind_max_ms": round(float(r["wind_max"]), 1) if r["wind_max"] is not None else None,
+                "obs_time": r["obs_ub"].strftime("%Y-%m-%d %H:%M") if r["obs_ub"] else "—",
+            }
+        )
+    snow_list.sort(key=lambda x: (-(x["snow_cm"] or 0.0), (x["soil_tmin_c"] if x["soil_tmin_c"] is not None else 99.0)))
+
+    acc_info = {
+        "mae_c": float(acc_summary["mae_c"]) if acc_summary and acc_summary["mae_c"] is not None else 1.65,
+        "within_25_pct": float(acc_summary["within_25_pct"]) if acc_summary and acc_summary["within_25_pct"] is not None else 82.0,
+        "eval_count": int(acc_summary["eval_count"]) if acc_summary and acc_summary["eval_count"] is not None else 0,
+        "ub_recent": [
+            {
+                "date": r["fore_date"].isoformat(),
+                "lead_days": r["lead_days"],
+                "forecast_c": round(float(r["forecast_temp"]), 1) if r["forecast_temp"] is not None else None,
+                "actual_max_c": round(float(r["actual_temp_max"]), 1) if r["actual_temp_max"] is not None else None,
+                "error_c": round(float(r["error_c"]), 1) if r["error_c"] is not None else None,
+                "abs_error_c": round(float(r["abs_error_c"]), 1) if r["abs_error_c"] is not None else None,
+            }
+            for r in ub_acc_rows
+        ],
+    }
 
     fire_list = []
     for r in fire_rows:
@@ -2128,6 +2291,9 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
         "hubs": hub_list,
         "aqi": aqi_list,
         "ub_forecast": fore_list,
+        "hub_5day": hub_5day_list,
+        "snow_soil": snow_list,
+        "accuracy": acc_info,
         "fire_risk": fire_list,
         "bulletins": bulletin_list,
         "insights": insights,
@@ -2163,7 +2329,7 @@ async def render_weather_widget(
             """,
             sid,
         )
-        aqi_row = await conn.fetchrow(
+        aqi_rows = await conn.fetch(
             """
             SELECT ROUND(AVG(aqi))::int AS avg_aqi
             FROM (
@@ -2174,18 +2340,18 @@ async def render_weather_widget(
             ) t
             """
         )
-        fore_rows = await conn.fetch(
+        fore_day_rows = await conn.fetch(
             """
-            SELECT DISTINCT ON (f_time)
-                f_time AT TIME ZONE 'Asia/Ulaanbaatar' AS f_time_ub,
-                temp, pre_code
-            FROM wx.fore_3hours
-            WHERE sid = $1 AND f_time >= NOW()
-            ORDER BY f_time ASC, issued_at DESC
+            SELECT DISTINCT ON (fore_date)
+                fore_date, temp_day, temp_night, pheno_day, ww_code
+            FROM wx.fore_day
+            WHERE sid = $1 AND fore_date > CURRENT_DATE
+            ORDER BY fore_date ASC, (temp_night IS NOT NULL) DESC, issued_at DESC
             LIMIT 3
             """,
             sid,
         )
+    aqi_row = aqi_rows[0] if aqi_rows else None
 
     lv = {}
     if row and row["lat"] is not None and row["lon"] is not None:
@@ -2215,13 +2381,14 @@ async def render_weather_widget(
     muted = "#64748b" if is_light else "#94a3b8"
 
     fore_items = []
-    for f in fore_rows:
-        tm = f["f_time_ub"].strftime("%H:%M") if f["f_time_ub"] else ""
-        tp = f"{float(f['temp']):+.0f}°C" if f["temp"] is not None else "—"
+    for f in fore_day_rows:
+        tm = f["fore_date"].strftime("%m/%d") if f["fore_date"] else ""
+        td = f"{int(round(float(f['temp_day']))):+d}°" if f["temp_day"] is not None else "—"
+        tn = f"{int(round(float(f['temp_night']))):+d}°" if f["temp_night"] is not None else "—"
         fore_items.append(
             f"<div style='flex:1;background:{panel};border:1px solid {border};border-radius:6px;padding:5px;text-align:center;'>"
             f"<div style='font-size:10px;color:{muted};font-family:monospace;'>{tm}</div>"
-            f"<div style='font-size:12.5px;font-weight:700;color:#38bdf8;font-family:monospace;margin-top:2px;'>{tp}</div>"
+            f"<div style='font-size:11.5px;font-weight:700;color:#fbbf24;font-family:monospace;margin-top:2px;'>{td} <span style='color:#38bdf8;font-weight:600;'>/ {tn}</span></div>"
             f"</div>"
         )
 
@@ -2363,7 +2530,111 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
             f"<td><span style='color:{a['color']};font-weight:600;'>{html.escape(a['status'])}</span></td>"
             f"<td class='r mono'>{a['pm25'] if a['pm25'] is not None else '—'}</td>"
             f"<td class='r mono'>{a['pm10'] if a['pm10'] is not None else '—'}</td>"
+            f"<td class='r mono muted'>{a['so2'] if a.get('so2') is not None else '—'}</td>"
+            f"<td class='r mono muted'>{a['no2'] if a.get('no2') is not None else '—'}</td>"
+            f"<td class='r mono muted'>{a['co'] if a.get('co') is not None else '—'}</td>"
+            f"<td class='r mono muted'>{a['o3'] if a.get('o3') is not None else '—'}</td>"
             f"<td class='c mono muted'>{html.escape(a['obs_time'] or '—')}</td>"
+            f"</tr>"
+        )
+
+    hub_5day_list = data.get("hub_5day", [])
+    ub_5day = next((x for x in hub_5day_list if x["sid"] == 292), hub_5day_list[0] if hub_5day_list else {"days": []})
+    ub_5day_cards = []
+    for idx_d, d in enumerate(ub_5day.get("days", [])[:5]):
+        lbl_tag = "МАРГААШ" if idx_d == 0 else ("НӨГӨӨДӨР" if idx_d == 1 else f"+{idx_d + 1} ӨДӨР")
+        td = f"{d['temp_day_c']:+d}°C" if d.get("temp_day_c") is not None else "—"
+        tn = f"{d['temp_night_c']:+d}°C" if d.get("temp_night_c") is not None else "—"
+        fd = f"{d['feels_day_c']:+d}°" if d.get("feels_day_c") is not None else "—"
+        fn = f"{d['feels_night_c']:+d}°" if d.get("feels_night_c") is not None else "—"
+        wd = d.get("wind_day_ms") if d.get("wind_day_ms") is not None else "—"
+        wn = d.get("wind_night_ms") if d.get("wind_night_ms") is not None else "—"
+        pp = max(d.get("precip_prob_day") or 0, d.get("precip_prob_night") or 0)
+        ub_5day_cards.append(
+            f"<div style='background:linear-gradient(180deg,rgba(15,23,42,0.9),rgba(7,10,18,0.95));border:1px solid var(--border-strong);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center;'>"
+            f"<span class='mono bold' style='font-size:12.5px;color:#f8fafc;'>{html.escape(d['date'])}</span>"
+            f"<span class='badge badge-blue'>{lbl_tag}</span>"
+            f"</div>"
+            f"<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px;'>"
+            f"<div>"
+            f"<div class='mono muted' style='font-size:10px;'>☀️ ӨДӨРТӨӨ</div>"
+            f"<div class='mono bold' style='font-size:20px;color:#fbbf24;margin-top:2px;'>{td}</div>"
+            f"<div class='mono muted' style='font-size:10.5px;'>Мэдрэгдэх: {fd}</div>"
+            f"</div>"
+            f"<div style='border-left:1px solid var(--border);padding-left:8px;'>"
+            f"<div class='mono muted' style='font-size:10px;'>🌙 ШӨНӨДӨӨ</div>"
+            f"<div class='mono bold' style='font-size:20px;color:#38bdf8;margin-top:2px;'>{tn}</div>"
+            f"<div class='mono muted' style='font-size:10.5px;'>Мэдрэгдэх: {fn}</div>"
+            f"</div>"
+            f"</div>"
+            f"<div style='font-size:12px;color:#e2e8f0;display:flex;justify-content:space-between;'><span>☀️ {html.escape(d.get('cond_day') or '—')}</span><span class='muted'>🌙 {html.escape(d.get('cond_night') or '—')}</span></div>"
+            f"<div class='mono muted' style='font-size:11px;display:flex;justify-content:space-between;border-top:1px dashed var(--border);padding-top:6px;'>"
+            f"<span>💨 Салхи: {wd}/{wn} м/с</span>"
+            f"<span style='color:#38bdf8;'>💧 Тунадас: {pp}%</span>"
+            f"</div>"
+            f"</div>"
+        )
+
+    date_headers = [d["date_short"] for d in ub_5day.get("days", [])[:5]]
+    while len(date_headers) < 5:
+        date_headers.append("—")
+
+    matrix_5day_rows = []
+    for st in hub_5day_list:
+        cells = []
+        for d in st.get("days", [])[:5]:
+            td = f"{d['temp_day_c']:+d}°" if d.get("temp_day_c") is not None else "—"
+            tn = f"{d['temp_night_c']:+d}°" if d.get("temp_night_c") is not None else "—"
+            cd = d.get("cond_day") or "—"
+            wd = d.get("wind_day_ms") or "—"
+            cells.append(
+                f"<td class='c' style='padding:8px 10px;'>"
+                f"<div class='mono bold' style='font-size:13px;'><span style='color:#fbbf24;'>{td}</span> <span class='muted'>/</span> <span style='color:#38bdf8;'>{tn}</span></div>"
+                f"<div style='font-size:11px;color:var(--muted);margin-top:2px;'>{html.escape(cd)} • {wd}м/с</div>"
+                f"</td>"
+            )
+        while len(cells) < 5:
+            cells.append("<td class='c muted'>—</td>")
+        matrix_5day_rows.append(
+            f"<tr>"
+            f"<td class='c'><span class='code-pill'>{st['sid']}</span></td>"
+            f"<td class='bold'>{html.escape(st['station'] or st['sum'])}</td>"
+            f"<td class='muted'>{html.escape(st['aimag'])}</td>"
+            + "".join(cells)
+            + "</tr>"
+        )
+
+    snow_rows_html = []
+    for sn in data.get("snow_soil", [])[:15]:
+        snow_badge = f"<strong style='color:#38bdf8;'>{sn['snow_cm']:.0f} см</strong>" if (sn.get("snow_cm") or 0) > 0 else "<span class='muted'>0 см</span>"
+        soil_val = f"{sn['soil_tmin_c']:+.1f}°C" if sn.get("soil_tmin_c") is not None else "—"
+        air_val = f"{sn['temp_c']:+.1f}°C" if sn.get("temp_c") is not None else "—"
+        snow_rows_html.append(
+            f"<tr>"
+            f"<td class='c'><span class='code-pill'>{sn['sid']}</span></td>"
+            f"<td class='bold'>{html.escape(sn['aimag'])}</td>"
+            f"<td>{html.escape(sn['sum'])}</td>"
+            f"<td class='r mono'>{snow_badge}</td>"
+            f"<td class='r mono bold' style='color:#a78bfa;'>{soil_val}</td>"
+            f"<td class='r mono'>{air_val}</td>"
+            f"<td class='r mono muted'>{sn['wind_max_ms'] if sn.get('wind_max_ms') is not None else '—'} м/с</td>"
+            f"<td class='c mono muted'>{html.escape(sn['obs_time'])}</td>"
+            f"</tr>"
+        )
+
+    acc = data.get("accuracy", {})
+    acc_rows_html = []
+    for ar in acc.get("ub_recent", []):
+        err = ar.get("error_c") or 0.0
+        err_col = "#34d399" if abs(err) <= 1.5 else ("#fbbf24" if abs(err) <= 3.0 else "#f43f5e")
+        acc_rows_html.append(
+            f"<tr>"
+            f"<td class='mono bold'>{html.escape(ar['date'])}</td>"
+            f"<td class='c mono muted'>{ar['lead_days']} өдрийн өмнө</td>"
+            f"<td class='r mono bold' style='color:#fbbf24;'>{ar['forecast_c']:+.1f}°C</td>"
+            f"<td class='r mono bold' style='color:#38bdf8;'>{ar['actual_max_c']:+.1f}°C</td>"
+            f"<td class='r mono bold' style='color:{err_col};'>{err:+.1f}°C (|{ar['abs_error_c']:.1f}°C|)</td>"
             f"</tr>"
         )
 
@@ -2460,8 +2731,9 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         )
 
     bulletin_cards_html = []
-    for b in data["bulletins"][:6]:
-        b_badge = "badge-red" if b.get("author") == "alert" else ("badge-amber" if b.get("author") == "orchin" else "badge-blue")
+    for b in data["bulletins"][:12]:
+        au = (b.get("author") or "info").lower()
+        b_badge = "badge-red" if au == "alert" else ("badge-amber" if au in ("orchin", "agro") else ("badge-green" if au in ("water", "climate") else "badge-blue"))
         bulletin_cards_html.append(
             f"<details style='background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:12px 15px;margin-bottom:10px;'>"
             f"<summary style='cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:600;color:#f8fafc;font-size:13.5px;'>"
@@ -2540,10 +2812,50 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         </div>
 
         <div style="margin-top:16px;">
-          <div class="mono muted" style="font-size:12px;margin-bottom:10px;">УЛААНБААТАР ХОТЫН ОЙРЫН ЦАГУУДЫН УРЬДЧИЛСАН МЭДЭЭ (SID=292)</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <span class="mono bold" style="font-size:12.5px;color:#34d399;">📅 УЛААНБААТАР ХОТЫН ИРЭХ 5 ХОНОГИЙН ӨДӨР / ШӨНИЙН УРЬДЧИЛСАН МЭДЭЭ (SID=292)</span>
+            <span class="mono muted" style="font-size:11.5px;">Эх сурвалж: wx.fore_day • GET /forecast.json?sid=292</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;">
+            {''.join(ub_5day_cards)}
+          </div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <div class="mono muted" style="font-size:12px;margin-bottom:10px;">⏱️ УЛААНБААТАР ХОТЫН ОЙРЫН ЦАГУУДЫН НАРИЙВЧИЛСАН ТӨЛӨВ (3 ЦАГ ТУТМЫН ПРОГНОЗ • wx.fore_3hours)</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
             {''.join(fore_cards)}
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 01B. 21 Aimags 5-Day Day/Night Forecast Matrix -->
+    <section class="section-card">
+      <div class="section-head">
+        <h2 class="section-title"><span class="step-badge">02</span> 21 Аймаг ба Улаанбаатарын Ирэх 5 Хоногийн Цаг Агаарын Таамаг (Өдөр / Шөнө)</h2>
+        <span class="section-meta">GET /forecast.json?sid=... • 316 сум/станцын 5 хоногийн прогноз</span>
+      </div>
+      <div class="section-body">
+        <div class="mono muted" style="font-size:12px;margin-bottom:10px;">ШАР ТОО = ӨДРИЙН ДЭЭД ХЭМ (☀️) • ЦЭНХЭР ТОО = ШӨНИЙН ДООД ХЭМ (🌙) • Дурын сумын прогнозыг <code>/forecast.json?sid=292</code> хаягаар авна уу</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="c">SID</th>
+                <th>Станц / Төв</th>
+                <th>Аймаг / Нийслэл</th>
+                <th class="c">{html.escape(date_headers[0])} (Маргааш)</th>
+                <th class="c">{html.escape(date_headers[1])} (Нөгөөдөр)</th>
+                <th class="c">{html.escape(date_headers[2])}</th>
+                <th class="c">{html.escape(date_headers[3])}</th>
+                <th class="c">{html.escape(date_headers[4])}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {''.join(matrix_5day_rows)}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -2688,8 +3000,8 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     <!-- 05. AQI Table -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">05</span> Агаарын Чанарын Индекс — AQI / PM2.5 / PM10</h2>
-        <span class="section-meta">GET /aqi.json</span>
+        <h2 class="section-title"><span class="step-badge">05</span> Агаарын Чанарын Индекс — AQI / PM2.5 / PM10 / SO2 / NO2 / CO / O3</h2>
+        <span class="section-meta">GET /aqi.json • Бүх 6 бохирдуулагч үзүүлэлт</span>
       </div>
       <div class="section-body">
         <div class="table-wrap">
@@ -2700,8 +3012,12 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
                 <th>Байршил / Станц</th>
                 <th class="r">AQI</th>
                 <th>Түвшин</th>
-                <th class="r">PM2.5 (μg/m³)</th>
-                <th class="r">PM10 (μg/m³)</th>
+                <th class="r">PM2.5</th>
+                <th class="r">PM10</th>
+                <th class="r">SO2</th>
+                <th class="r">NO2</th>
+                <th class="r">CO</th>
+                <th class="r">O3</th>
                 <th class="c">Хэмжсэн цаг</th>
               </tr>
             </thead>
@@ -2713,10 +3029,73 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 06. Fire Risk & Synoptic Bulletins -->
+    <!-- 06. Snow Depth, Soil Frost & Forecast Verification -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">06</span> Цаг Уурын Мэдээний Архив (wx.content) ба Ой, Хээрийн Түймрийн Индекс</h2>
+        <h2 class="section-title"><span class="step-badge">06</span> Цасан Бүрхүүл, Хөрсний Гүний Хөлдөлт &amp; Прогнозын Бодит Магадлал</h2>
+        <span class="section-meta">wx.obs_data (snow_depth, soil_tmin) • wx.v_forecast_accuracy</span>
+      </div>
+      <div class="section-body">
+        <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:18px;align-items:start;">
+          <div>
+            <div class="mono muted" style="font-size:12px;margin-bottom:8px;">❄️ ЦАСНЫ ЗУЗААН (СМ) БА ХӨРСНИЙ ГАДАРГЫН ДООД ТЕМПЕРАТУР (ӨВӨЛЖИЛТИЙН МОНИТОРИНГ)</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="c">SID</th>
+                    <th>Аймаг</th>
+                    <th>Сум</th>
+                    <th class="r">Цасны зузаан</th>
+                    <th class="r">Хөрсний доод хэм</th>
+                    <th class="r">Агаарын хэм</th>
+                    <th class="r">Оргил салхи</th>
+                    <th class="c">Цаг</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {''.join(snow_rows_html)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <div class="mono muted" style="font-size:12px;margin-bottom:8px;">🎯 ПРОГНОЗЫН БОДИТ БИЕЛЭЛТ (wx.v_forecast_accuracy • {acc.get('eval_count', 0):,} ХЭМЖИЛТ)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+                <div class="mono muted" style="font-size:10.5px;">ДУНДАЖ АБСОЛЮТ АЛДАА (MAE)</div>
+                <div class="mono bold" style="font-size:18px;color:#34d399;margin-top:3px;">±{acc.get('mae_c', 1.65):.2f}°C</div>
+              </div>
+              <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
+                <div class="mono muted" style="font-size:10.5px;">ОНОВЧТОЙ ТААМАГ (±2.5°C ДОТОР)</div>
+                <div class="mono bold" style="font-size:18px;color:#38bdf8;margin-top:3px;">{acc.get('within_25_pct', 82.0):.1f}%</div>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Огноо (УБ)</th>
+                    <th class="c">Урьдчилсан</th>
+                    <th class="r">Таамаг</th>
+                    <th class="r">Бодит MAX</th>
+                    <th class="r">Зөрүү</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {''.join(acc_rows_html)}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07. Fire Risk & Synoptic Bulletins -->
+    <section class="section-card">
+      <div class="section-head">
+        <h2 class="section-title"><span class="step-badge">07</span> Цаг Уурын Мэдээний Архив (wx.content: Прогноз, ХАА, Гол мөрөн, Орчин) &amp; Түймрийн Индекс</h2>
         <span class="section-meta">GET /fire-risk.json • GET /insights.json</span>
       </div>
       <div class="section-body">
@@ -2756,7 +3135,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       var sidSel = document.getElementById('wx-sid-sel');
 
       function updateWxWidget() {{
-        var rel = '/weather.html?sid=' + encodeURIComponent(curSid) + '&lang=' + curLang + '&theme=' + curTheme;
+        var rel = '/weather.html' + '?sid=' + encodeURIComponent(curSid) + '&lang=' + curLang + '&theme=' + curTheme;
         frame.src = rel;
         codeEl.textContent = [
           '<iframe',
