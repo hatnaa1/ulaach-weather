@@ -3355,15 +3355,15 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
 
       var xRenderer = am5xy.AxisRendererX.new(rootHm, {{
         visible: false,
-        minGridDistance: 24,
+        minGridDistance: 32,
         opposite: true
       }});
       xRenderer.grid.template.set('visible', false);
       xRenderer.labels.template.setAll({{
-        fill: am5.color(0x94a3b8),
-        fontSize: 11,
+        fill: am5.color(0xe2e8f0),
+        fontSize: 12,
         fontFamily: 'JetBrains Mono, monospace',
-        paddingBottom: 6
+        paddingBottom: 8
       }});
 
       var xAxis = chartHm.xAxes.push(
@@ -3375,20 +3375,19 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
 
       var hmTooltip = am5.Tooltip.new(rootHm, {{
         autoTextColor: false,
-        getFillFromSprite: false,
+        getFillFromSprite: true,
         pointerOrientation: 'vertical',
-        labelText: '[bold #38bdf8]{{stationName}} — {{date}} {{hour}}[/]\\n[#94a3b8]Температур:[/] [bold #fbbf24]{{value}}°C[/] [#94a3b8](Мэдрэгдэх: {{feels_c}}°C)[/]\\n[#94a3b8]Чийгшил / Салхи:[/] [bold #ffffff]{{humidity_pct}}% • {{wind_ms}} м/с[/]\\n[#94a3b8]Төлөв:[/] [bold #34d399]{{condition}}[/]'
+        labelText: '[bold #ffffff]{{day}}, {{hour}}: {{value}}°C[/]\\n[#f8fafc]Мэдрэгдэх: {{feels_c}}°C • Салхи: {{wind_ms}} м/с • {{condition}}[/]'
       }});
       hmTooltip.get('background').setAll({{
-        fill: am5.color(0x090d16),
         fillOpacity: 0.96,
-        stroke: am5.color(0x38bdf8),
+        stroke: am5.color(0xffffff),
         strokeWidth: 1.5,
-        cornerRadius: 8
+        cornerRadius: 6
       }});
       hmTooltip.label.setAll({{
-        fill: am5.color(0xf8fafc),
-        fontSize: 12,
+        fill: am5.color(0xffffff),
+        fontSize: 12.5,
         fontFamily: 'JetBrains Mono, monospace'
       }});
 
@@ -3406,24 +3405,25 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         }})
       );
 
-      // Clean demo-style cells: NO text bullets inside cells, rounded corners, dark gap border
+      // Exact amCharts Heat Map with Legend demo styling: flat crisp rectangles, 2px gap, slate-indigo (#4f5d95) -> warm coral (#e07a5f)
       seriesHm.columns.template.setAll({{
-        tooltipY: am5.percent(20),
+        tooltipText: '{{day}}, {{hour}}: {{value}}°C',
+        tooltipY: am5.percent(10),
         strokeOpacity: 1,
         strokeWidth: 2,
         stroke: am5.color(0x090d16),
-        cornerRadiusTL: 5,
-        cornerRadiusTR: 5,
-        cornerRadiusBL: 5,
-        cornerRadiusBR: 5,
+        cornerRadiusTL: 2,
+        cornerRadiusTR: 2,
+        cornerRadiusBL: 2,
+        cornerRadiusBR: 2,
         width: am5.percent(100),
         height: am5.percent(100)
       }});
 
       seriesHm.set('heatRules', [{{
         target: seriesHm.columns.template,
-        min: am5.color(0x0284c7),
-        max: am5.color(0xf59e0b),
+        min: am5.color(0x4b5897),
+        max: am5.color(0xe27653),
         dataField: 'value',
         key: 'fill'
       }}]);
@@ -3431,21 +3431,21 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       var heatLegend = chartHm.bottomAxesContainer.children.push(
         am5.HeatLegend.new(rootHm, {{
           orientation: 'horizontal',
-          startColor: am5.color(0x0284c7),
-          endColor: am5.color(0xf59e0b),
-          stepCount: 10,
-          paddingTop: 14
+          startColor: am5.color(0x4b5897),
+          endColor: am5.color(0xe27653),
+          stepCount: 5,
+          paddingTop: 16
         }})
       );
       heatLegend.startLabel.setAll({{
-        fontSize: 12,
-        fill: am5.color(0x38bdf8),
+        fontSize: 12.5,
+        fill: am5.color(0xcbd5e1),
         fontWeight: '700',
         fontFamily: 'JetBrains Mono, monospace'
       }});
       heatLegend.endLabel.setAll({{
-        fontSize: 12,
-        fill: am5.color(0xfbbf24),
+        fontSize: 12.5,
+        fill: am5.color(0xf8fafc),
         fontWeight: '700',
         fontFamily: 'JetBrains Mono, monospace'
       }});
@@ -3453,7 +3453,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       seriesHm.columns.template.events.on('pointerover', function(ev) {{
         var di = ev.target.dataItem;
         if (di) {{
-          heatLegend.showValue(di.get('value', 0));
+          heatLegend.showValue(di.get('value', 0), di.get('value', 0) + '°C');
         }}
       }});
 
@@ -3462,8 +3462,8 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         var hi = seriesHm.getPrivate('valueHigh');
         heatLegend.set('startValue', lo);
         heatLegend.set('endValue', hi);
-        heatLegend.set('startText', (lo !== undefined ? lo : '') + '°C (Хүйтэн)');
-        heatLegend.set('endText', (hi !== undefined ? '+' + hi : '').replace('+-', '-') + '°C (Дулаан)');
+        heatLegend.set('startText', (lo !== undefined ? lo + '°C' : ''));
+        heatLegend.set('endText', (hi !== undefined ? (hi > 0 ? '+' + hi : hi) + '°C' : ''));
       }});
 
       // 2. amCharts 5 Selected Station 3-Hour Forecast Curve
