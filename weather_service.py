@@ -51,7 +51,7 @@ WX_WIDGET_I18N: dict[str, dict[str, str]] = {
         "sun": "Нар",
         "aqi": "Агаарын чанар (AQI)",
         "forecast": "Ойрын төлөв",
-        "source": "ЦУОШГ / weather.ulaach.cc",
+        "source": "weather.ulaach.cc",
     },
     "EN": {
         "title": "Weather & AQI",
@@ -60,7 +60,7 @@ WX_WIDGET_I18N: dict[str, dict[str, str]] = {
         "sun": "Sun",
         "aqi": "Air Quality (AQI)",
         "forecast": "Forecast",
-        "source": "NAMEM / weather.ulaach.cc",
+        "source": "weather.ulaach.cc",
     },
     "CN": {
         "title": "蒙古天气与空气质量",
@@ -2012,6 +2012,16 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
             """
         )
 
+        ub_daily_rows = await conn.fetch(
+            """
+            SELECT obs_date, temp_min, temp_max, temp_avg, precip_max, wind_max, humidity_avg, obs_count
+            FROM wx.v_obs_daily
+            WHERE sid = 292 AND obs_date >= CURRENT_DATE - INTERVAL '14 days'
+            ORDER BY obs_date DESC
+            LIMIT 14
+            """
+        )
+
         hub_5day_rows = await conn.fetch(
             """
             SELECT DISTINCT ON (f.sid, f.fore_date)
@@ -2188,6 +2198,21 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
             }
         )
 
+    ub_daily_list = []
+    for r in ub_daily_rows:
+        ub_daily_list.append(
+            {
+                "date": r["obs_date"].isoformat() if r["obs_date"] else "",
+                "temp_min_c": round(float(r["temp_min"]), 1) if r["temp_min"] is not None else None,
+                "temp_max_c": round(float(r["temp_max"]), 1) if r["temp_max"] is not None else None,
+                "temp_avg_c": round(float(r["temp_avg"]), 1) if r["temp_avg"] is not None else None,
+                "precip_mm": round(float(r["precip_max"]), 1) if r["precip_max"] is not None else 0.0,
+                "wind_max_ms": round(float(r["wind_max"]), 1) if r["wind_max"] is not None else None,
+                "humidity_pct": int(round(float(r["humidity_avg"]))) if r["humidity_avg"] is not None else None,
+                "obs_count": int(r["obs_count"] or 0),
+            }
+        )
+
     hub_5day_map: dict[int, dict[str, Any]] = {}
     for r in hub_5day_rows:
         sid = r["sid"]
@@ -2291,6 +2316,7 @@ async def fetch_weather_hub_data(wx_pool: asyncpg.Pool) -> dict[str, Any]:
         "hubs": hub_list,
         "aqi": aqi_list,
         "ub_forecast": fore_list,
+        "ub_daily": ub_daily_list,
         "hub_5day": hub_5day_list,
         "snow_soil": snow_list,
         "accuracy": acc_info,
@@ -2486,7 +2512,7 @@ async def render_weather_widget(
       {''.join(fore_items)}
     </div>
     <div class="foot">
-      <span>{html.escape(labels['source'])}</span>
+      <span>{html.escape(labels['forecast'])}</span>
       <a href="https://weather.ulaach.cc" target="_blank">weather.ulaach.cc</a>
     </div>
   </div>
@@ -2542,7 +2568,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     ub_5day = next((x for x in hub_5day_list if x["sid"] == 292), hub_5day_list[0] if hub_5day_list else {"days": []})
     ub_5day_cards = []
     for idx_d, d in enumerate(ub_5day.get("days", [])[:5]):
-        lbl_tag = "МАРГААШ" if idx_d == 0 else ("НӨГӨӨДӨР" if idx_d == 1 else f"+{idx_d + 1} ӨДӨР")
+        lbl_tag = "МАРГААШ" if idx_d == 0 else f"+{idx_d + 1} ӨДӨР"
         td = f"{d['temp_day_c']:+d}°C" if d.get("temp_day_c") is not None else "—"
         tn = f"{d['temp_night_c']:+d}°C" if d.get("temp_night_c") is not None else "—"
         fd = f"{d['feels_day_c']:+d}°" if d.get("feels_day_c") is not None else "—"
@@ -2552,9 +2578,9 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         pp = max(d.get("precip_prob_day") or 0, d.get("precip_prob_night") or 0)
         ub_5day_cards.append(
             f"<div style='background:linear-gradient(180deg,rgba(15,23,42,0.9),rgba(7,10,18,0.95));border:1px solid var(--border-strong);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;'>"
-            f"<div style='display:flex;justify-content:space-between;align-items:center;'>"
-            f"<span class='mono bold' style='font-size:12.5px;color:#f8fafc;'>{html.escape(d['date'])}</span>"
-            f"<span class='badge badge-blue'>{lbl_tag}</span>"
+            f"<div style='display:flex;justify-content:space-between;align-items:center;gap:6px;'>"
+            f"<span class='mono bold' style='font-size:12.5px;color:#f8fafc;white-space:nowrap;'>{html.escape(d['date'])}</span>"
+            f"<span class='badge badge-blue' style='white-space:nowrap;flex-shrink:0;'>{lbl_tag}</span>"
             f"</div>"
             f"<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px;'>"
             f"<div>"
@@ -2635,6 +2661,21 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
             f"<td class='r mono bold' style='color:#fbbf24;'>{ar['forecast_c']:+.1f}°C</td>"
             f"<td class='r mono bold' style='color:#38bdf8;'>{ar['actual_max_c']:+.1f}°C</td>"
             f"<td class='r mono bold' style='color:{err_col};'>{err:+.1f}°C (|{ar['abs_error_c']:.1f}°C|)</td>"
+            f"</tr>"
+        )
+
+    ub_daily_rows_html = []
+    for ud in data.get("ub_daily", [])[:14]:
+        ub_daily_rows_html.append(
+            f"<tr>"
+            f"<td class='mono bold'>{html.escape(ud['date'])}</td>"
+            f"<td class='r mono' style='color:#38bdf8;'>{ud['temp_min_c']:+.1f}°C</td>"
+            f"<td class='r mono bold' style='color:#fbbf24;'>{ud['temp_max_c']:+.1f}°C</td>"
+            f"<td class='r mono'>{ud['temp_avg_c']:+.1f}°C</td>"
+            f"<td class='r mono muted'>{ud['humidity_pct'] if ud.get('humidity_pct') is not None else '—'}%</td>"
+            f"<td class='r mono' style='color:#34d399;'>{ud['wind_max_ms'] if ud.get('wind_max_ms') is not None else '—'} м/с</td>"
+            f"<td class='r mono'>{ud['precip_mm']:.1f} мм</td>"
+            f"<td class='c mono muted'>{ud['obs_count']} удаа</td>"
             f"</tr>"
         )
 
@@ -2846,10 +2887,10 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
                 <th>Станц / Төв</th>
                 <th>Аймаг / Нийслэл</th>
                 <th class="c">{html.escape(date_headers[0])} (Маргааш)</th>
-                <th class="c">{html.escape(date_headers[1])} (Нөгөөдөр)</th>
-                <th class="c">{html.escape(date_headers[2])}</th>
-                <th class="c">{html.escape(date_headers[3])}</th>
-                <th class="c">{html.escape(date_headers[4])}</th>
+                <th class="c">{html.escape(date_headers[1])} (+2 өдөр)</th>
+                <th class="c">{html.escape(date_headers[2])} (+3 өдөр)</th>
+                <th class="c">{html.escape(date_headers[3])} (+4 өдөр)</th>
+                <th class="c">{html.escape(date_headers[4])} (+5 өдөр)</th>
               </tr>
             </thead>
             <tbody>
@@ -3032,8 +3073,8 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     <!-- 06. Snow Depth, Soil Frost & Forecast Verification -->
     <section class="section-card">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">06</span> Цасан Бүрхүүл, Хөрсний Гүний Хөлдөлт &amp; Прогнозын Бодит Магадлал</h2>
-        <span class="section-meta">wx.obs_data (snow_depth, soil_tmin) • wx.v_forecast_accuracy</span>
+        <h2 class="section-title"><span class="step-badge">06</span> Цасан Бүрхүүл, Хөрсний Гүний Хөлдөлт, Өдрийн Түүх &amp; Прогнозын Магадлал</h2>
+        <span class="section-meta">wx.obs_data (snow_depth, soil_tmin) • wx.v_obs_daily • wx.v_forecast_accuracy</span>
       </div>
       <div class="section-body">
         <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:18px;align-items:start;">
@@ -3087,6 +3128,29 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;">
+          <div class="mono muted" style="font-size:12px;margin-bottom:8px;">📊 УЛААНБААТАР ХОТЫН СҮҮЛИЙН 14 ХОНОГИЙН ӨДРИЙН НЭГДСЭН ТҮҮХ (wx.v_obs_daily • MIN / MAX / AVG / САЛХИ / ТУНАДАС)</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Огноо</th>
+                  <th class="r">Доод хэм (MIN)</th>
+                  <th class="r">Дээд хэм (MAX)</th>
+                  <th class="r">Дундаж хэм (AVG)</th>
+                  <th class="r">Дундаж чийгшил</th>
+                  <th class="r">Оргил салхи</th>
+                  <th class="r">Тунадас</th>
+                  <th class="c">Хэмжилтийн тоо</th>
+                </tr>
+              </thead>
+              <tbody>
+                {''.join(ub_daily_rows_html)}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
