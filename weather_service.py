@@ -3077,61 +3077,64 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         <span class="section-meta">wx.obs_data (snow_depth, soil_tmin) • wx.v_obs_daily • wx.v_forecast_accuracy</span>
       </div>
       <div class="section-body">
-        <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:18px;align-items:start;">
-          <div>
-            <div class="mono muted" style="font-size:12px;margin-bottom:8px;">❄️ ЦАСНЫ ЗУЗААН (СМ) БА ХӨРСНИЙ ГАДАРГЫН ДООД ТЕМПЕРАТУР (ӨВӨЛЖИЛТИЙН МОНИТОРИНГ)</div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th class="c">SID</th>
-                    <th>Аймаг</th>
-                    <th>Сум</th>
-                    <th class="r">Цасны зузаан</th>
-                    <th class="r">Хөрсний доод хэм</th>
-                    <th class="r">Агаарын хэм</th>
-                    <th class="r">Оргил салхи</th>
-                    <th class="c">Цаг</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {''.join(snow_rows_html)}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <div class="mono muted" style="font-size:12px;margin-bottom:8px;">🎯 ПРОГНОЗЫН БОДИТ БИЕЛЭЛТ (wx.v_forecast_accuracy • {acc.get('eval_count', 0):,} ХЭМЖИЛТ)</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
-                <div class="mono muted" style="font-size:10.5px;">ДУНДАЖ АБСОЛЮТ АЛДАА (MAE)</div>
-                <div class="mono bold" style="font-size:18px;color:#34d399;margin-top:3px;">±{acc.get('mae_c', 1.65):.2f}°C</div>
-              </div>
-              <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
-                <div class="mono muted" style="font-size:10.5px;">ОНОВЧТОЙ ТААМАГ (±2.5°C ДОТОР)</div>
-                <div class="mono bold" style="font-size:18px;color:#38bdf8;margin-top:3px;">{acc.get('within_25_pct', 82.0):.1f}%</div>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Огноо (УБ)</th>
-                    <th class="c">Урьдчилсан</th>
-                    <th class="r">Таамаг</th>
-                    <th class="r">Бодит MAX</th>
-                    <th class="r">Зөрүү</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {''.join(acc_rows_html)}
-                </tbody>
-              </table>
-            </div>
+        <div>
+          <div class="mono muted" style="font-size:12px;margin-bottom:8px;">❄️ ЦАСНЫ ЗУЗААН (СМ) БА ХӨРСНИЙ ГАДАРГЫН ДООД ТЕМПЕРАТУР (ӨВӨЛЖИЛТИЙН МОНИТОРИНГ • wx.obs_data)</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="c">SID</th>
+                  <th>Аймаг</th>
+                  <th>Сум</th>
+                  <th class="r">Цасны зузаан</th>
+                  <th class="r">Хөрсний доод хэм</th>
+                  <th class="r">Агаарын хэм</th>
+                  <th class="r">Оргил салхи</th>
+                  <th class="c">Цаг</th>
+                </tr>
+              </thead>
+              <tbody>
+                {''.join(snow_rows_html)}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div style="margin-top:18px;">
+        <div style="margin-top:20px;">
+          <div class="mono muted" style="font-size:12px;margin-bottom:8px;">🎯 ПРОГНОЗЫН БОДИТ БИЕЛЭЛТ БА УЛААНБААТАРЫН СҮҮЛИЙН ХАРЬЦУУЛАЛТ (wx.v_forecast_accuracy • {acc.get('eval_count', 0):,} ХЭМЖИЛТ)</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:10px;">
+            <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+              <div class="mono muted" style="font-size:11px;">ДУНДАЖ АБСОЛЮТ АЛДАА (MAE)</div>
+              <div class="mono bold" style="font-size:19px;color:#34d399;margin-top:3px;">±{acc.get('mae_c', 1.65):.2f}°C</div>
+            </div>
+            <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+              <div class="mono muted" style="font-size:11px;">ОНОВЧТОЙ ТААМАГ (±2.5°C ДОТОР)</div>
+              <div class="mono bold" style="font-size:19px;color:#38bdf8;margin-top:3px;">{acc.get('within_25_pct', 82.0):.1f}%</div>
+            </div>
+            <div style="background:var(--bg-code);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+              <div class="mono muted" style="font-size:11px;">ШАЛГАСАН НИЙТ ПРОГНОЗ</div>
+              <div class="mono bold" style="font-size:19px;color:#fbbf24;margin-top:3px;">{acc.get('eval_count', 0):,} мөр</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Огноо (Улаанбаатар • SID=292)</th>
+                  <th class="c">Урьдчилж гаргасан хугацаа</th>
+                  <th class="r">Урьдчилсан таамаг (Өдөр)</th>
+                  <th class="r">Бодит хэмжсэн MAX</th>
+                  <th class="r">Зөрүү (Алдаа)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {''.join(acc_rows_html)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;">
           <div class="mono muted" style="font-size:12px;margin-bottom:8px;">📊 УЛААНБААТАР ХОТЫН СҮҮЛИЙН 14 ХОНОГИЙН ӨДРИЙН НЭГДСЭН ТҮҮХ (wx.v_obs_daily • MIN / MAX / AVG / САЛХИ / ТУНАДАС)</div>
           <div class="table-wrap">
             <table>
