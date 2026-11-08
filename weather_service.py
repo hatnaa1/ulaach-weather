@@ -1103,32 +1103,65 @@ def _common_head(title: str, active_site: str) -> str:
     seo_meta = build_seo_meta_html(active_site, title_override=title)
 
     return f"""<!DOCTYPE html>
-<html lang="mn">
+<html lang="mn" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{html.escape(title)}</title>
 {seo_meta}
+  <script>
+    (function() {{
+      try {{
+        var saved = localStorage.getItem('ulaach-theme');
+        if (saved === 'dark' || saved === 'light') {{
+          document.documentElement.setAttribute('data-theme', saved);
+        }}
+      }} catch (e) {{}}
+    }})();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root {{
-      --bg: #090d16;
-      --bg-panel: #0f1523;
-      --bg-code: #070a12;
-      --border: #1e293b;
-      --border-strong: #334155;
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --dim: #64748b;
-      --accent: #38bdf8;
-      --green: #34d399;
-      --amber: #fbbf24;
-      --rose: #f43f5e;
-      --purple: #a78bfa;
-      --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    :root, html[data-theme="light"] {{
+      --bg: #F6F5F0;
+      --bg-panel: #FFFFFF;
+      --bg-code: #FAF9F5;
+      --border: #E5E3DC;
+      --border-strong: #D1CFC7;
+      --text: #141413;
+      --muted: #5E5D59;
+      --dim: #787771;
+      --accent: #0284C7;
+      --green: #0D9488;
+      --amber: #D97706;
+      --rose: #E11D48;
+      --purple: #7C3AED;
+      --brand-gold: #F5A11C;
+      --topbar-bg: rgba(250, 249, 245, 0.92);
+      --nav-seg-bg: #EAE8E0;
+      --card-shadow: 0 1px 2px rgba(20, 20, 19, 0.04), 0 4px 16px rgba(20, 20, 19, 0.03);
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, Arial, sans-serif;
       --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }}
+    html[data-theme="dark"] {{
+      --bg: #0A0B0E;
+      --bg-panel: #111318;
+      --bg-code: #0D0F14;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      --text: #F3F4F6;
+      --muted: #9CA3AF;
+      --dim: #6B7280;
+      --accent: #38BDF8;
+      --green: #34D399;
+      --amber: #FBBF24;
+      --rose: #F43F5E;
+      --purple: #A78BFA;
+      --brand-gold: #F5A11C;
+      --topbar-bg: rgba(10, 11, 14, 0.88);
+      --nav-seg-bg: rgba(255, 255, 255, 0.05);
+      --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
     }}
     * {{ box-sizing: border-box; }}
     html {{ scroll-behavior: smooth; }}
@@ -1137,138 +1170,242 @@ def _common_head(title: str, active_site: str) -> str:
       font-family: var(--sans);
       color: var(--text);
       background-color: var(--bg);
-      background-image:
-        linear-gradient(to right, rgba(30, 41, 59, 0.25) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(30, 41, 59, 0.25) 1px, transparent 1px);
-      background-size: 32px 32px;
+      background-image: none;
       line-height: 1.55;
       -webkit-font-smoothing: antialiased;
+      transition: background-color 0.15s ease, color 0.15s ease;
     }}
     a {{ color: var(--accent); text-decoration: none; }}
     a:hover {{ text-decoration: underline; }}
+
+    /* Universal inline-color overrides in Light Mode so legacy dark inline styles stay high-contrast */
+    html[data-theme="light"] [style*="color:#f8fafc"],
+    html[data-theme="light"] [style*="color: #f8fafc"],
+    html[data-theme="light"] [style*="color:#e2e8f0"],
+    html[data-theme="light"] [style*="color:#cbd5e1"] {{
+      color: var(--text) !important;
+    }}
+    html[data-theme="light"] [style*="color:#38bdf8"] {{
+      color: #0369A1 !important;
+    }}
+    html[data-theme="light"] [style*="color:#34d399"] {{
+      color: #0F766E !important;
+    }}
+    html[data-theme="light"] [style*="color:#fbbf24"],
+    html[data-theme="light"] [style*="color:#f59e0b"] {{
+      color: #B45309 !important;
+    }}
+    html[data-theme="light"] [style*="color:#f43f5e"] {{
+      color: #BE123C !important;
+    }}
+    html[data-theme="light"] [style*="color:#a78bfa"] {{
+      color: #6D28D9 !important;
+    }}
+    html[data-theme="light"] [style*="background:rgba(7,10,18"],
+    html[data-theme="light"] [style*="background:linear-gradient(180deg,rgba(15,23,42"],
+    html[data-theme="light"] [style*="background:#090d16"],
+    html[data-theme="light"] [style*="background:#0f1523"],
+    html[data-theme="light"] [style*="background:rgba(15,23,42"] {{
+      background: var(--bg-code) !important;
+      color: var(--text) !important;
+    }}
 
     .topbar {{
       position: sticky;
       top: 0;
       z-index: 40;
       backdrop-filter: blur(12px);
-      background: rgba(9, 13, 22, 0.88);
+      background: var(--topbar-bg);
       border-bottom: 1px solid var(--border);
     }}
     .topbar-inner {{
-      max-width: 1120px;
+      max-width: 1180px;
       margin: 0 auto;
-      padding: 12px 24px;
+      padding: 10px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 14px;
       flex-wrap: wrap;
     }}
     .brand {{
       display: flex;
       align-items: center;
       gap: 10px;
-      font-family: var(--mono);
+      font-family: var(--sans);
       font-weight: 700;
-      font-size: 14px;
-      color: #f8fafc;
+      font-size: 15px;
+      color: var(--text);
       letter-spacing: -0.02em;
       text-decoration: none !important;
     }}
     .brand-dot {{
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 10px var(--green);
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: #F5A11C;
+      color: #111111;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 13px;
+      box-shadow: 0 1px 3px rgba(245, 161, 28, 0.35);
+    }}
+    .brand-dot::after {{
+      content: "У";
     }}
     .nav-links {{
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       flex-wrap: wrap;
+      background: var(--nav-seg-bg);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
     }}
     .nav-pill {{
-      font-family: var(--mono);
-      font-size: 12px;
+      font-family: var(--sans);
+      font-size: 12.5px;
+      font-weight: 500;
       color: var(--muted);
-      padding: 6px 11px;
-      border-radius: 6px;
+      padding: 5px 11px;
+      border-radius: 7px;
       border: 1px solid transparent;
       transition: all 0.15s;
       text-decoration: none !important;
     }}
     .nav-pill:hover {{
-      color: #f8fafc;
-      background: rgba(30, 41, 59, 0.65);
-      border-color: var(--border-strong);
+      color: var(--text);
+      background: rgba(128, 128, 128, 0.08);
     }}
     .nav-pill.active {{
-      color: var(--green);
-      background: rgba(16, 185, 129, 0.12);
-      border-color: rgba(16, 185, 129, 0.35);
+      color: var(--text);
+      background: var(--bg-panel);
+      border-color: var(--border);
       font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }}
+    .theme-toggle-btn {{
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 11px;
+      border-radius: 8px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-panel);
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }}
+    .theme-toggle-btn:hover {{
+      border-color: #F5A11C;
+    }}
+
+    /* Segmented View Tabs (Open-Meteo / macOS style) */
+    .view-tabs-bar {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: var(--nav-seg-bg);
+      padding: 5px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+    }}
+    .view-tabs-list {{
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }}
+    .view-tab-btn {{
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 15px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }}
+    .view-tab-btn:hover {{
+      color: var(--text);
+    }}
+    .view-tab-btn.active {{
+      background: var(--bg-panel);
+      color: var(--text);
+      border-color: var(--border);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
     }}
 
     .wrap {{
-      max-width: 1120px;
+      max-width: 1180px;
       margin: 0 auto;
-      padding: 28px 24px 72px;
+      padding: 24px 24px 72px;
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 20px;
     }}
     .hero {{
-      background: linear-gradient(180deg, rgba(15, 21, 35, 0.95) 0%, rgba(9, 13, 22, 0.95) 100%);
+      background: var(--bg-panel);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px 28px;
+      border-radius: 14px;
+      padding: 22px 26px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
+      box-shadow: var(--card-shadow);
     }}
     .hero h1 {{
       margin: 0;
       font-size: 24px;
       font-weight: 700;
       letter-spacing: -0.025em;
-      color: #f8fafc;
+      color: var(--text);
     }}
     .hero p {{
       margin: 0;
       font-size: 14px;
       color: var(--muted);
-      max-width: 860px;
+      max-width: 880px;
+      line-height: 1.55;
     }}
     .status-strip {{
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       margin-top: 4px;
     }}
     .stat-chip {{
       font-family: var(--mono);
       font-size: 12px;
       padding: 5px 11px;
-      border-radius: 6px;
+      border-radius: 7px;
       background: var(--bg-code);
       border: 1px solid var(--border);
       color: var(--muted);
     }}
-    .stat-chip strong {{ color: #f8fafc; }}
+    .stat-chip strong {{ color: var(--text); font-weight: 600; }}
 
     .section-card {{
       background: var(--bg-panel);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      box-shadow: var(--card-shadow);
     }}
     .section-head {{
-      padding: 15px 24px;
+      padding: 15px 22px;
       border-bottom: 1px solid var(--border);
-      background: rgba(7, 10, 18, 0.55);
+      background: var(--bg-code);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -1278,46 +1415,50 @@ def _common_head(title: str, active_site: str) -> str:
     .section-title {{
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       margin: 0;
-      font-size: 15px;
+      font-size: 15.5px;
       font-weight: 600;
-      color: #f8fafc;
+      color: var(--text);
+      letter-spacing: -0.01em;
     }}
     .step-badge {{
       font-family: var(--mono);
       font-size: 11px;
       font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 5px;
-      background: rgba(16, 185, 129, 0.14);
-      color: var(--green);
-      border: 1px solid rgba(16, 185, 129, 0.35);
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(245, 161, 28, 0.16);
+      color: #D97706;
+      border: 1px solid rgba(245, 161, 28, 0.4);
+    }}
+    html[data-theme="dark"] .step-badge {{
+      color: #F5A11C;
     }}
     .section-meta {{
       font-family: var(--mono);
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--dim);
     }}
     .section-body {{
-      padding: 22px 24px;
+      padding: 20px 22px;
     }}
 
     .ep-list {{
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      margin-bottom: 18px;
+      gap: 8px;
+      margin-bottom: 16px;
     }}
     .ep-item {{
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 14px;
-      padding: 11px 14px;
+      padding: 10px 14px;
       background: var(--bg-code);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 9px;
       flex-wrap: wrap;
     }}
     .ep-left {{
@@ -1331,17 +1472,17 @@ def _common_head(title: str, active_site: str) -> str:
       font-family: var(--mono);
       font-size: 11px;
       font-weight: 700;
-      padding: 3px 7px;
-      border-radius: 4px;
-      background: rgba(16, 185, 129, 0.15);
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: rgba(13, 148, 136, 0.13);
       color: var(--green);
-      border: 1px solid rgba(16, 185, 129, 0.35);
+      border: 1px solid rgba(13, 148, 136, 0.3);
     }}
     .ep-url {{
       font-family: var(--mono);
       font-size: 13px;
       color: var(--accent);
-      font-weight: 500;
+      font-weight: 600;
       word-break: break-all;
     }}
     .ep-desc {{
@@ -1360,14 +1501,14 @@ def _common_head(title: str, active_site: str) -> str:
     .code-pane {{
       background: var(--bg-code);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
     }}
     .code-pane-bar {{
       padding: 8px 14px;
-      background: rgba(15, 23, 42, 0.75);
+      background: var(--nav-seg-bg);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -1379,53 +1520,60 @@ def _common_head(title: str, active_site: str) -> str:
       flex-wrap: wrap;
     }}
     .copy-btn, .run-btn {{
-      font-family: var(--mono);
-      font-size: 11.5px;
+      font-family: var(--sans);
+      font-size: 12px;
       padding: 5px 12px;
-      border-radius: 5px;
-      background: rgba(30, 41, 59, 0.85);
+      border-radius: 6px;
+      background: var(--bg-panel);
       color: var(--text);
       border: 1px solid var(--border-strong);
       cursor: pointer;
       font-weight: 600;
+      transition: all 0.15s;
     }}
     .run-btn {{
-      background: rgba(16, 185, 129, 0.16);
-      color: var(--green);
-      border-color: rgba(16, 185, 129, 0.4);
+      background: #141413;
+      color: #FFFFFF;
+      border-color: #141413;
+    }}
+    html[data-theme="dark"] .run-btn {{
+      background: #F5A11C;
+      color: #111111;
+      border-color: #F5A11C;
     }}
     .copy-btn:hover, .run-btn:hover {{
       border-color: var(--accent);
-      color: #fff;
+      opacity: 0.92;
     }}
     .inp {{
-      background: var(--bg-code);
+      background: var(--bg-panel);
       border: 1px solid var(--border-strong);
-      color: #f8fafc;
-      font-family: var(--mono);
-      font-size: 12.5px;
-      padding: 7px 11px;
-      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      padding: 8px 11px;
+      border-radius: 7px;
       outline: none;
     }}
     .inp:focus {{
       border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
     }}
     pre {{
       margin: 0;
       padding: 14px;
       font-family: var(--mono);
-      font-size: 12.5px;
+      font-size: 12px;
       line-height: 1.55;
-      color: #cbd5e1;
+      color: var(--text);
       overflow-x: auto;
     }}
 
     .table-wrap {{
       overflow-x: auto;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      background: var(--bg-code);
+      border-radius: 10px;
+      background: var(--bg-panel);
     }}
     table {{
       width: 100%;
@@ -1434,52 +1582,51 @@ def _common_head(title: str, active_site: str) -> str:
     }}
     th, td {{
       padding: 9px 12px;
-      border-bottom: 1px solid rgba(30, 41, 59, 0.7);
+      border-bottom: 1px solid var(--border);
       text-align: left;
       white-space: nowrap;
     }}
     th {{
-      background: rgba(15, 23, 42, 0.85);
+      background: var(--bg-code);
       color: var(--muted);
-      font-family: var(--mono);
-      font-size: 11px;
+      font-family: var(--sans);
+      font-size: 11.5px;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      letter-spacing: 0.01em;
     }}
     tbody tr:hover {{
-      background: rgba(30, 41, 59, 0.35);
+      background: var(--bg-code);
     }}
-    .r {{ text-align: right; }}
+    .r {{ text-align: right; font-variant-numeric: tabular-nums; }}
     .c {{ text-align: center; }}
-    .mono {{ font-family: var(--mono); }}
-    .bold {{ font-weight: 600; color: #f8fafc; }}
+    .mono {{ font-family: var(--mono); font-variant-numeric: tabular-nums; }}
+    .bold {{ font-weight: 600; color: var(--text); }}
     .muted {{ color: var(--muted); }}
     .code-pill {{
       display: inline-block;
       font-family: var(--mono);
       font-size: 11.5px;
-      font-weight: 700;
+      font-weight: 600;
       padding: 2px 7px;
-      border-radius: 4px;
-      background: rgba(16, 185, 129, 0.13);
-      color: var(--green);
-      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 5px;
+      background: var(--bg-code);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
     }}
     code {{
       font-family: var(--mono);
       font-size: 12px;
-      background: rgba(15, 23, 42, 0.9);
+      background: var(--bg-code);
       border: 1px solid var(--border);
       padding: 2px 6px;
-      border-radius: 4px;
+      border-radius: 5px;
       color: var(--accent);
     }}
 
     .svc-grid {{
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 18px;
+      gap: 16px;
     }}
     @media (max-width: 900px) {{
       .svc-grid {{ grid-template-columns: 1fr; }}
@@ -1487,16 +1634,17 @@ def _common_head(title: str, active_site: str) -> str:
     .svc-card {{
       background: var(--bg-panel);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 22px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       gap: 16px;
+      box-shadow: var(--card-shadow);
       transition: border-color 0.15s, transform 0.15s;
     }}
     .svc-card:hover {{
-      border-color: var(--accent);
+      border-color: var(--border-strong);
       transform: translateY(-2px);
     }}
     .svc-head {{
@@ -1507,63 +1655,71 @@ def _common_head(title: str, active_site: str) -> str:
     }}
     .svc-domain {{
       font-family: var(--mono);
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 700;
       color: var(--accent);
     }}
     .svc-live {{
       font-family: var(--mono);
       font-size: 11px;
-      padding: 3px 8px;
+      font-weight: 600;
+      padding: 3px 9px;
       border-radius: 999px;
-      background: rgba(16, 185, 129, 0.14);
+      background: rgba(13, 148, 136, 0.12);
       color: var(--green);
-      border: 1px solid rgba(16, 185, 129, 0.35);
+      border: 1px solid rgba(13, 148, 136, 0.28);
     }}
     .svc-title {{
-      margin: 8px 0 6px;
-      font-size: 17px;
+      margin: 6px 0 4px;
+      font-size: 17.5px;
       font-weight: 700;
-      color: #f8fafc;
+      color: var(--text);
+      letter-spacing: -0.015em;
     }}
     .svc-desc {{
       margin: 0;
-      font-size: 13px;
+      font-size: 13.5px;
       color: var(--muted);
+      line-height: 1.5;
     }}
     .svc-metric {{
       background: var(--bg-code);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 12px 14px;
       font-family: var(--mono);
       font-size: 12.5px;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 6px;
     }}
     .svc-btn {{
       display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 9px 14px;
-      border-radius: 7px;
-      font-family: var(--mono);
-      font-size: 12.5px;
+      border-radius: 8px;
+      font-family: var(--sans);
+      font-size: 13px;
       font-weight: 600;
-      background: rgba(56, 189, 248, 0.12);
-      color: var(--accent);
-      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: #141413;
+      color: #FFFFFF;
+      border: 1px solid #141413;
       text-decoration: none !important;
+      transition: opacity 0.15s;
+    }}
+    html[data-theme="dark"] .svc-btn {{
+      background: rgba(245, 161, 28, 0.15);
+      color: #F5A11C;
+      border-color: rgba(245, 161, 28, 0.4);
     }}
     .svc-btn:hover {{
-      background: rgba(56, 189, 248, 0.22);
-      color: #fff;
+      opacity: 0.9;
     }}
     .footer {{
       text-align: center;
-      font-family: var(--mono);
-      font-size: 12px;
+      font-family: var(--sans);
+      font-size: 12.5px;
       color: var(--dim);
       padding-top: 8px;
     }}
@@ -1574,18 +1730,65 @@ def _common_head(title: str, active_site: str) -> str:
     <div class="topbar-inner">
       <a class="brand" href="https://ulaach.cc">
         <span class="brand-dot"></span>
-        <span>ulaach.cc // Developer Platform</span>
+        <span>Улаач • Open Data &amp; API</span>
       </a>
-      <nav class="nav-links">
-        <a class="{_cls('portal')}" href="https://ulaach.cc">Portal (ulaach.cc)</a>
-        <a class="{_cls('fx')}" href="https://fx.ulaach.cc">FX Rates (fx.ulaach.cc)</a>
-        <a class="{_cls('weather')}" href="https://weather.ulaach.cc">Weather &amp; AQI (weather.ulaach.cc)</a>
-        <a class="{_cls('les')}" href="https://les.ulaach.cc">Legal Entities (les.ulaach.cc)</a>
-        <a class="{_cls('tool')}" href="https://tool.ulaach.cc">IP &amp; Net Tools (tool.ulaach.cc)</a>
-        <a class="{_cls('util')}" href="https://util.ulaach.cc">MN Dev Utils (util.ulaach.cc)</a>
-      </nav>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <nav class="nav-links">
+          <a class="{_cls('portal')}" href="https://ulaach.cc">Портал</a>
+          <a class="{_cls('fx')}" href="https://fx.ulaach.cc">Валютын Ханш</a>
+          <a class="{_cls('weather')}" href="https://weather.ulaach.cc">Цаг Агаар &amp; AQI</a>
+          <a class="{_cls('les')}" href="https://les.ulaach.cc">Хуулийн Этгээд</a>
+          <a class="{_cls('tool')}" href="https://tool.ulaach.cc">IP &amp; Сүлжээ</a>
+          <a class="{_cls('util')}" href="https://util.ulaach.cc">Хөрвүүлэгч</a>
+        </nav>
+        <button type="button" class="theme-toggle-btn" id="ulaach-theme-btn" onclick="window.__toggleUlaachTheme()" title="Өдөр / Шөнийн горим солих">
+          <span id="ulaach-theme-icon">🌙</span>
+          <span id="ulaach-theme-label">Dark</span>
+        </button>
+      </div>
     </div>
   </header>
+  <script>
+    (function() {{
+      function syncBtn() {{
+        var cur = document.documentElement.getAttribute('data-theme') || 'light';
+        var ic = document.getElementById('ulaach-theme-icon');
+        var lb = document.getElementById('ulaach-theme-label');
+        if (ic && lb) {{
+          if (cur === 'dark') {{
+            ic.textContent = '☀️';
+            lb.textContent = 'Light';
+          }} else {{
+            ic.textContent = '🌙';
+            lb.textContent = 'Dark';
+          }}
+        }}
+      }}
+      window.__toggleUlaachTheme = function() {{
+        var cur = document.documentElement.getAttribute('data-theme') || 'light';
+        var next = (cur === 'dark') ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try {{ localStorage.setItem('ulaach-theme', next); }} catch (e) {{}}
+        syncBtn();
+      }};
+      window.__switchViewTab = function(group, tabId, btn) {{
+        document.querySelectorAll('[data-tab-group="' + group + '"]').forEach(function(sec) {{
+          var list = (sec.getAttribute('data-tab-id') || '').split(' ');
+          if (tabId === 'all' || list.indexOf(tabId) !== -1) {{
+            sec.style.display = '';
+          }} else {{
+            sec.style.display = 'none';
+          }}
+        }});
+        if (btn && btn.parentElement) {{
+          btn.parentElement.querySelectorAll('.view-tab-btn').forEach(function(b) {{ b.classList.remove('active'); }});
+          btn.classList.add('active');
+        }}
+        window.dispatchEvent(new Event('resize'));
+      }};
+      syncBtn();
+    }})();
+  </script>
 """
 
 
@@ -2831,73 +3034,40 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
         + f"""
   <main class="wrap">
     <section class="hero">
-      <h1>Монгол орны Цаг агаар, Нар мандах ба Агаарын чанарын Developer API</h1>
-      <p>Монгол улсын 21 аймаг, {data['total_stations']} сум/станцын цаг тутмын бодит ажиглалт, нар мандах/жаргах цаг, ой хээрийн түймрийн эрсдэл, агаарын чанар (AQI) болон олон хэлний веб виджет.</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+        <div>
+          <div class="mono" style="font-size:11.5px;color:var(--green);font-weight:700;">METEOROLOGY, AQI &amp; SYNOPTIC INSIGHTS // OPEN-METEO + 321 STATIONS</div>
+          <h1>Монгол орны Цаг агаар, Нар мандах ба Агаарын чанарын Платформ</h1>
+        </div>
+        <a href="/weather.json" target="_blank" class="run-btn" style="text-decoration:none;">GET /weather.json →</a>
+      </div>
+      <p>Монгол улсын 21 аймаг, {data['total_stations']} сум/станцын цаг тутмын бодит ажиглалт, 5 хоногийн ба 3 цагийн урьдчилсан мэдээ, 7 хоног × 24 цагийн дулааны зураглал (Heat Map), агаарын чанар (AQI) болон олон хэлний веб виджет.</p>
       <div class="status-strip">
-        <span class="stat-chip">ULAANBAATAR: <strong>{ub_temp_str} ({html.escape(ub.get('condition', 'Тогтуун'))}, салхи {ub.get('wind_ms', '—')} м/с)</strong></span>
-        <span class="stat-chip">SUNRISE/SUNSET: <strong>{html.escape(ub_sun_str)}</strong></span>
-        <span class="stat-chip">STATIONS: <strong>{data['total_stations']} станц</strong></span>
-        <span class="stat-chip">LAST_OBS (UB): <strong>{html.escape(data['latest_obs_ub'])}</strong></span>
+        <span class="stat-chip">УЛААНБААТАР: <strong>{ub_temp_str} ({html.escape(ub.get('condition', 'Тогтуун'))}, салхи {ub.get('wind_ms', '—')} м/с)</strong></span>
+        <span class="stat-chip">НАР МАНДАХ/ЖАРГАХ: <strong>{html.escape(ub_sun_str)}</strong></span>
+        <span class="stat-chip">СТАНЦУУД: <strong>{data['total_stations']} станц</strong></span>
+        <span class="stat-chip">СҮҮЛИЙН ХЭМЖИЛТ: <strong>{html.escape(data['latest_obs_ub'])}</strong></span>
       </div>
     </section>
 
-    <!-- 01. Endpoints & Forecast -->
-    <section class="section-card">
+    <div class="view-tabs-bar">
+      <div class="view-tabs-list">
+        <button type="button" class="view-tab-btn active" onclick="window.__switchViewTab('wx', 'forecast', this)">🌤️ Таамаг &amp; 7×24ц Heat Map</button>
+        <button type="button" class="view-tab-btn" onclick="window.__switchViewTab('wx', 'stations', this)">🌫️ AQI, 28 Станц &amp; Өвөлжилт</button>
+        <button type="button" class="view-tab-btn" onclick="window.__switchViewTab('wx', 'synoptic', this)">🚨 Синоптик Дохио &amp; Мэдээ</button>
+        <button type="button" class="view-tab-btn" onclick="window.__switchViewTab('wx', 'api', this)">⚡ Developer API &amp; Виджет</button>
+      </div>
+      <button type="button" class="copy-btn" onclick="window.__switchViewTab('wx', 'all', this)">Бүгдийг дэлгэх</button>
+    </div>
+
+    <!-- 01. Forecast Cards -->
+    <section class="section-card" data-tab-group="wx" data-tab-id="forecast">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">01</span> Шууд дуудах Цаг агаарын JSON Endpoint-ууд ба IFrame Виджет</h2>
-        <span class="section-meta">Content-Type: application/json; charset=utf-8</span>
+        <h2 class="section-title"><span class="step-badge">01</span> Улаанбаатар хотын Ирэх 5 Хоногийн болон 3 Цаг тутмын Урьдчилсан Мэдээ</h2>
+        <span class="section-meta">Эх сурвалж: wx.fore_day • wx.fore_3hours • GET /forecast.json?sid=292</span>
       </div>
       <div class="section-body">
-        <div class="ep-list">
-          <div class="ep-item">
-            <div class="ep-left">
-              <span class="method-get">GET</span>
-              <a class="ep-url" href="/weather.json" target="_blank">/weather.json</a>
-            </div>
-            <span class="ep-desc">Улаанбаатар ба 21 аймгийн төвийн (28 гол станц) цаг агаар + нар мандах/жаргах цаг</span>
-          </div>
-          <div class="ep-item">
-            <div class="ep-left">
-              <span class="method-get">GET</span>
-              <a class="ep-url" href="/aqi.json" target="_blank">/aqi.json</a>
-            </div>
-            <span class="ep-desc">Улаанбаатар ба орон нутгийн агаарын чанарын индекс (AQI, PM2.5, PM10, SO2, NO2)</span>
-          </div>
-          <div class="ep-item">
-            <div class="ep-left">
-              <span class="method-get">GET</span>
-              <a class="ep-url" href="/forecast.json?sid=292" target="_blank">/forecast.json?sid=292</a>
-            </div>
-            <span class="ep-desc">3 цаг тутмын болон өдрийн урьдчилсан мэдээ</span>
-          </div>
-          <div class="ep-item">
-            <div class="ep-left">
-              <span class="method-get">GET</span>
-              <a class="ep-url" href="/insights.json" target="_blank">/insights.json</a>
-            </div>
-            <span class="ep-desc">Тоон ажиглалт + синоптик мэдээн (<code>wx.content</code>) дээр суурилсан 24 цагийн таамаглал, сэрэмжлүүлэг ба эрсдэлийн индекс</span>
-          </div>
-          <div class="ep-item">
-            <div class="ep-left">
-              <span class="method-get">GET</span>
-              <a class="ep-url" href="/fire-risk.json" target="_blank">/fire-risk.json</a>
-            </div>
-            <span class="ep-desc">Ой, хээрийн түймрийн эрсдэлийн индекс ба цаг агаарын сэрэмжлүүлэг мэдээ</span>
-          </div>
-          <div class="ep-item">
-            <div class="ep-left">
-              <span class="method-get">GET</span>
-              <a class="ep-url" href="/weather.html?sid=292&lang=MN&theme=dark" target="_blank">/weather.html?sid=292&amp;lang=MN&amp;theme=dark</a>
-            </div>
-            <span class="ep-desc">Вэб сайтад шигтгэдэг олон хэлний (<code>MN/EN/CN/JP/KR</code>) Цаг агаар + AQI IFrame виджет</span>
-          </div>
-        </div>
-
-        <div style="margin-top:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-            <span class="mono bold" style="font-size:12.5px;color:#34d399;">📅 УЛААНБААТАР ХОТЫН ИРЭХ 5 ХОНОГИЙН ӨДӨР / ШӨНИЙН УРЬДЧИЛСАН МЭДЭЭ (SID=292)</span>
-            <span class="mono muted" style="font-size:11.5px;">Эх сурвалж: wx.fore_day • GET /forecast.json?sid=292</span>
-          </div>
+        <div>
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;">
             {''.join(ub_5day_cards)}
           </div>
@@ -2913,7 +3083,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 01B. 7-Day x 24-Hour Temperature Heat Map with Legend + 28 Stations Matrix -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="wx" data-tab-id="forecast">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">02</span> 7 Хоног × 24 Цагийн Цаг Агаарын Дулааны Зураглал (amCharts 5 Heat Map with Legend)</h2>
         <span class="section-meta">amCharts 5 HeatLegend • GET /forecast.json?sid=292 • 28 Станцаар сонгох</span>
@@ -2921,27 +3091,28 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       <div class="section-body">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <span class="mono bold" style="font-size:12.5px;color:#34d399;">📍 БАЙРШИЛ / СТАНЦ СОНГОХ:</span>
-            <select id="wx-hm-sid-sel" style="background:#090d16;border:1px solid var(--accent);color:#f8fafc;border-radius:8px;padding:6px 12px;font-family:var(--mono);font-size:12.5px;font-weight:700;cursor:pointer;">
+            <span class="mono bold" style="font-size:12.5px;color:var(--green);">📍 БАЙРШИЛ / СТАНЦ СОНГОХ:</span>
+            <select id="wx-hm-sid-sel" class="inp" style="font-family:var(--mono);font-size:12.5px;font-weight:700;cursor:pointer;">
               {''.join(station_options)}
             </select>
             <span id="wx-hm-status" class="mono muted" style="font-size:11.5px;">Сүүлийн 7 хоногийн 24 цагийн (00:00 – 23:00) дулааны матриц • Хулгана ойртуулж харна уу</span>
           </div>
-          <a id="wx-hm-api-link" href="/forecast.json?sid=292" target="_blank" class="mono" style="font-size:11.5px;color:#38bdf8;">GET /forecast.json?sid=292 →</a>
+          <a id="wx-hm-api-link" href="/forecast.json?sid=292" target="_blank" class="mono" style="font-size:11.5px;color:var(--accent);">GET /forecast.json?sid=292 →</a>
         </div>
 
-        <div id="wx-heatmap-chart" style="width:100%;height:420px;background:rgba(7,10,18,0.75);border:1px solid var(--border);border-radius:10px;padding:10px;"></div>
+        <!-- Keep dark canvas specifically for amCharts 5 Heat Map & 3h chart so colors pop identically in Light & Dark modes -->
+        <div id="wx-heatmap-chart" style="width:100%;height:420px;background:#0B0F17 !important;color:#F8FAFC !important;border:1px solid var(--border);border-radius:12px;padding:12px;"></div>
 
-        <div style="margin-top:18px;background:rgba(7,10,18,0.75);border:1px solid var(--border);border-radius:10px;padding:14px;">
+        <div style="margin-top:16px;background:#0B0F17 !important;color:#F8FAFC !important;border:1px solid var(--border);border-radius:12px;padding:14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-            <span id="wx-3h-title" class="mono bold" style="font-size:12.5px;color:#38bdf8;">📈 СОНГОСОН СТАНЦЫН ИРЭХ 24–48 ЦАГИЙН ТЕМПЕРАТУР &amp; МЭДРЭГДЭХ ХЭМИЙН МУРУЙ (amCharts 5)</span>
-            <span class="mono muted" style="font-size:11px;">wx.fore_3hours • 3 цаг тутмын нарийвчилсан прогноз</span>
+            <span id="wx-3h-title" class="mono bold" style="font-size:12.5px;color:#38bdf8 !important;">📈 СОНГОСОН СТАНЦЫН ИРЭХ 24–48 ЦАГИЙН ТЕМПЕРАТУР &amp; МЭДРЭГДЭХ ХЭМИЙН МУРУЙ (amCharts 5)</span>
+            <span class="mono" style="font-size:11px;color:#94a3b8 !important;">wx.fore_3hours • 3 цаг тутмын нарийвчилсан прогноз</span>
           </div>
           <div id="wx-ub3h-chart" style="width:100%;height:280px;"></div>
         </div>
 
         <div style="margin-top:20px;">
-          <div class="mono muted" style="font-size:12px;margin-bottom:10px;">📋 21 АЙМАГ БА УЛААНБААТАРЫН ИРЭХ 5 ХОНОГИЙН ӨДӨР (☀️ ШАР) / ШӨНИЙН (🌙 ЦЭНХЭР) ТААМГИЙН ХҮСНЭГТ</div>
+          <div class="mono muted" style="font-size:12px;margin-bottom:10px;">📋 21 АЙМАГ БА УЛААНБААТАРЫН ИРЭХ 5 ХОНОГИЙН ӨДӨР / ШӨНИЙН ТААМГИЙН ХҮСНЭГТ</div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -2966,7 +3137,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 03. AI & Synoptic Weather Predictions + Alert Engine -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="wx" data-tab-id="synoptic" style="display:none;">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">03</span> Цаг Агаарын Эрсдэлийн Таамаглал &amp; Синоптик Шинжилгээ (24 цаг)</h2>
         <span class="section-meta">GET /insights.json • Тоон телеметр + wx.content синоптик мэдээ</span>
@@ -2992,57 +3163,73 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       </div>
     </section>
 
-    <!-- 04. GET Parameters & Multi-language Weather IFrame Widget -->
-    <section class="section-card">
+    <!-- 04. Developer API Endpoints & Multi-language Weather IFrame Widget -->
+    <section class="section-card" data-tab-group="wx" data-tab-id="api" style="display:none;">
       <div class="section-head">
-        <h2 class="section-title"><span class="step-badge">04</span> Цаг агаарын Олон Хэлний IFrame Виджет ба GET Параметрүүд</h2>
+        <h2 class="section-title"><span class="step-badge">04</span> Шууд дуудах JSON API Endpoint-ууд ба Олон Хэлний IFrame Виджет</h2>
         <span class="section-meta">Supported Languages: MN, EN, CN, JP, KR • Dark &amp; Light</span>
       </div>
       <div class="section-body">
-        <div class="table-wrap" style="margin-bottom:16px;">
-          <table>
-            <thead>
-              <tr>
-                <th style="width:140px;">Параметр</th>
-                <th style="width:210px;">Жишээ утга</th>
-                <th>Тайлбар</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><span class="badge badge-blue">sid</span></td>
-                <td class="mono">292 | 244 | 236 | 373</td>
-                <td>Станцын дугаар (<code>292</code> = Улаанбаатар, <code>244</code> = Дархан, <code>236</code> = Эрдэнэт, <code>373</code> = Даланзадгад г.м. 321 станц)</td>
-              </tr>
-              <tr>
-                <td><span class="badge badge-blue">lang</span></td>
-                <td class="mono">MN | EN | CN | JP | KR</td>
-                <td>Виджетийн хэлний сонголт (Монгол, Англи, Хятад, Япон, Солонгос)</td>
-              </tr>
-              <tr>
-                <td><span class="badge badge-blue">theme</span></td>
-                <td class="mono">dark | light</td>
-                <td>Бараан (<code>dark</code>) эсвэл Цайвар (<code>light</code>) загвар</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="ep-list">
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/weather.json" target="_blank">/weather.json</a>
+            </div>
+            <span class="ep-desc">Улаанбаатар ба 21 аймгийн төвийн (28 гол станц) цаг агаар + нар мандах/жаргах цаг</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/aqi.json" target="_blank">/aqi.json</a>
+            </div>
+            <span class="ep-desc">Улаанбаатар ба орон нутгийн агаарын чанарын индекс (AQI, PM2.5, PM10, SO2, NO2)</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/forecast.json?sid=292" target="_blank">/forecast.json?sid=292</a>
+            </div>
+            <span class="ep-desc">3 цаг тутмын, 5 хоногийн урьдчилсан мэдээ ба 7×24ц дулааны матриц</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/insights.json" target="_blank">/insights.json</a>
+            </div>
+            <span class="ep-desc">Тоон ажиглалт + синоптик мэдээн (<code>wx.content</code>) дээр суурилсан 24 цагийн таамаглал</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/fire-risk.json" target="_blank">/fire-risk.json</a>
+            </div>
+            <span class="ep-desc">Ой, хээрийн түймрийн эрсдэлийн индекс ба цаг агаарын сэрэмжлүүлэг мэдээ</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/weather.html?sid=292&lang=MN&theme=dark" target="_blank">/weather.html?sid=292&amp;lang=MN&amp;theme=dark</a>
+            </div>
+            <span class="ep-desc">Вэб сайтад шигтгэдэг олон хэлний (<code>MN/EN/CN/JP/KR</code>) Цаг агаар + AQI IFrame виджет</span>
+          </div>
         </div>
 
         <style>
-          .wx-tabs {{ display:inline-flex; gap:4px; background:#090d16; padding:3px; border-radius:6px; border:1px solid var(--border); }}
+          .wx-tabs {{ display:inline-flex; gap:4px; background:var(--bg-panel); padding:3px; border-radius:6px; border:1px solid var(--border); }}
           .wx-tab-btn {{
             background:transparent; border:none; color:var(--muted); font-family:var(--mono);
             font-size:11px; font-weight:600; padding:4px 9px; border-radius:4px; cursor:pointer;
           }}
-          .wx-tab-btn.active {{ background:rgba(56,189,248,0.18); color:var(--accent); }}
+          .wx-tab-btn.active {{ background:var(--accent); color:#fff; }}
         </style>
 
         <div style="display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start;">
-          <div class="code-box">
-            <div class="code-head" style="flex-wrap:wrap;gap:8px;">
+          <div class="code-pane">
+            <div class="code-pane-bar" style="flex-wrap:wrap;gap:8px;">
               <span>HTML Embed (IFrame Widget)</span>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <select id="wx-sid-sel" style="background:#090d16;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-family:var(--mono);font-size:11.5px;">
+                <select id="wx-sid-sel" class="inp" style="padding:4px 8px;font-family:var(--mono);font-size:11.5px;">
                   {''.join(station_options)}
                 </select>
                 <div class="wx-tabs" id="wx-lang-tabs">
@@ -3072,7 +3259,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 05. 28 Hub Stations with Sunrise/Sunset -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="wx" data-tab-id="stations" style="display:none;">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">05</span> 21 Аймаг ба Гол Станцуудын Бодит Ажиглалт + Нар мандах/жаргах</h2>
         <span class="section-meta">Шинэчлэгдсэн: {html.escape(data['latest_obs_ub'])} (GET /weather.json)</span>
@@ -3103,7 +3290,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 06. AQI Table -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="wx" data-tab-id="stations" style="display:none;">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">06</span> Агаарын Чанарын Индекс — AQI / PM2.5 / PM10 / SO2 / NO2 / CO / O3</h2>
         <span class="section-meta">GET /aqi.json • Бүх 6 бохирдуулагч үзүүлэлт</span>
@@ -3135,7 +3322,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 07. Snow Depth, Soil Frost & Forecast Verification -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="wx" data-tab-id="stations" style="display:none;">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">07</span> Цасан Бүрхүүл, Хөрсний Гүний Хөлдөлт, Өдрийн Түүх &amp; Прогнозын Магадлал</h2>
         <span class="section-meta">wx.obs_data (snow_depth, soil_tmin) • wx.v_obs_daily • wx.v_forecast_accuracy</span>
@@ -3224,7 +3411,7 @@ async def render_weather_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 08. Fire Risk & Synoptic Bulletins -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="wx" data-tab-id="synoptic" style="display:none;">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">08</span> Цаг Уурын Мэдээний Архив (wx.content: Прогноз, ХАА, Гол мөрөн, Орчин) &amp; Түймрийн Индекс</h2>
         <span class="section-meta">GET /fire-risk.json • GET /insights.json</span>
@@ -4110,7 +4297,16 @@ async def render_les_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 01. Interactive Full-Field Search Engine -->
-    <section class="section-card">
+    <div class="view-tabs-bar">
+      <div class="view-tabs-list">
+        <button type="button" class="view-tab-btn active" onclick="window.__switchViewTab('les', 'search', this)">🔍 Хуулийн Этгээд Хайх</button>
+        <button type="button" class="view-tab-btn" onclick="window.__switchViewTab('les', 'stats', this)">📊 2005–2026 Оны График &amp; Хэлбэр</button>
+        <button type="button" class="view-tab-btn" onclick="window.__switchViewTab('les', 'api', this)">⚡ Developer JSON API</button>
+      </div>
+      <button type="button" class="copy-btn" onclick="window.__switchViewTab('les', 'all', this)">Бүгдийг дэлгэх</button>
+    </div>
+
+    <section class="section-card" data-tab-group="les" data-tab-id="search">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">01</span> Бүх Талбараар Шууд Хайх Систем (РД, Нэр, Хувьцаа эзэмшигч, Захирал, Эцсийн өмчлөгч, Чиглэл)</h2>
         <span class="section-meta">PostgreSQL GIN Trigram Index • Хурд: ~1–5 ms</span>
@@ -4184,7 +4380,7 @@ async def render_les_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
     </section>
 
     <!-- 02. Шууд дуудах Developer JSON API Endpoint-ууд -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="les" data-tab-id="api" style="display:none;">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">02</span> Шууд дуудах JSON API Endpoint-ууд</h2>
         <span class="section-meta">Content-Type: application/json; charset=utf-8</span>
@@ -4274,17 +4470,17 @@ curl -s "https://les.ulaach.cc/search.json?q=програм&amp;field=activity&a
     </section>
 
     <!-- 03. Registration Trends Chart (amCharts 5) & Legal Form Breakdown -->
-    <section class="section-card">
+    <section class="section-card" data-tab-group="les" data-tab-id="stats" style="display:none;">
       <div class="section-head">
         <h2 class="section-title"><span class="step-badge">03</span> Жил Бүрийн Шинээр Бүртгэгдсэн Хуулийн Этгээдийн Тоо (2005–2026) &amp; Хэлбэрийн Ангилал</h2>
         <span class="section-meta">amCharts 5 Interactive Chart • GET /stats.json</span>
       </div>
       <div class="section-body">
-        <div style="background:linear-gradient(180deg,rgba(15,23,42,0.88) 0%,rgba(7,10,18,0.96) 100%);border:1px solid var(--border-strong);border-radius:10px;padding:16px;margin-bottom:20px;">
+        <div style="background:#0B0F17 !important;color:#F8FAFC !important;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <div>
-              <div class="mono bold" style="font-size:13px;color:#f8fafc;">📊 ОН ТУС БҮРЭЭР БҮРТГЭГДСЭН ХУУЛИЙН ЭТГЭЭДИЙН ТОО (2005–2026)</div>
-              <div class="muted" style="font-size:12px;">Багана дээр хулгана ойртуулж тухайн онд бүртгэгдсэн ААН-ийн тоог харна уу (багана дээр дарвал тухайн оноор шүүнэ)</div>
+              <div class="mono bold" style="font-size:13px;color:#f8fafc !important;">📊 ОН ТУС БҮРЭЭР БҮРТГЭГДСЭН ХУУЛИЙН ЭТГЭЭДИЙН ТОО (2005–2026)</div>
+              <div style="font-size:12px;color:#94a3b8 !important;">Багана дээр хулгана ойртуулж тухайн онд бүртгэгдсэн ААН-ийн тоог харна уу (багана дээр дарвал тухайн оноор шүүнэ)</div>
             </div>
           </div>
           <div id="les-year-chart" style="width:100%;height:290px;"></div>
