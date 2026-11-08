@@ -4288,11 +4288,11 @@ async def render_les_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
       <h1>Монгол Улсын Хуулийн Этгээдийн Бүртгэлийн Нээлттэй Өгөгдөл &amp; Developer API</h1>
       <p>Монгол улсад бүртгэлтэй <strong>{total_ent:,}</strong> хуулийн этгээдийн регистрийн дугаар, оноосон нэр, бүртгэсэн огноо, хэлбэр, үүсгэн байгуулагч / хувьцаа эзэмшигч, итгэмжлэлгүйгээр төлөөлөх албан тушаалтан, эцсийн өмчлөгч (UBO), үйл ажиллагааны чиглэл ба өөрчлөн байгуулагдсан түүхийн лавлагаа.</p>
       <div class="status-strip">
-        <span class="stat-chip">TOTAL_ENTITIES: <strong style="color:#f59e0b;">{total_ent:,}</strong></span>
-        <span class="stat-chip">EXECUTIVES: <strong style="color:#38bdf8;">{with_ex:,}</strong></span>
-        <span class="stat-chip">SHAREHOLDERS: <strong style="color:#34d399;">{with_sh:,}</strong></span>
-        <span class="stat-chip">BENEFICIAL_OWNERS: <strong>{with_ubo:,}</strong></span>
-        <span class="stat-chip">DATA_SIZE: <strong>{fsize_mb} MB ({html.escape(src_updated[:10])})</strong></span>
+        <span class="stat-chip">НИЙТ ААН: <strong style="color:#f59e0b;">{total_ent:,}</strong></span>
+        <span class="stat-chip">УДИРДЛАГА: <strong style="color:#38bdf8;">{with_ex:,}</strong></span>
+        <span class="stat-chip">ХУВЬЦАА ЭЗЭМШИГЧ: <strong style="color:#34d399;">{with_sh:,}</strong></span>
+        <span class="stat-chip">ЭЦСИЙН ӨМЧЛӨГЧ: <strong>{with_ubo:,}</strong></span>
+        <span class="stat-chip">ШИНЭЧЛЭГДСЭН: <strong>{html.escape(src_updated[:10])}</strong></span>
       </div>
     </section>
 
