@@ -890,6 +890,14 @@ _SEO_CONFIG: dict[str, dict[str, str]] = {
         "badge": "MONGOLIAN FINTECH & LANGUAGE UTILITIES",
         "accent": "#a78bfa",
     },
+    "les": {
+        "canonical": "https://les.ulaach.cc/",
+        "title": "les.ulaach.cc — Монгол Улсын Хуулийн Этгээдийн Бүртгэлийн Нээлттэй Өгөгдөл & Developer API",
+        "description": "Монгол улсын 272,869 хуулийн этгээдийн регистрийн дугаар, оноосон нэр, үүсгэн байгуулагч/хувьцаа эзэмшигч, гүйцэтгэх удирдлага, эцсийн өмчлөгч, үйл ажиллагааны чиглэлийн хайлт болон Developer JSON API (/company.json, /search.json, /stats.json).",
+        "keywords": "хуулийн этгээдийн бүртгэл, компанийн регистр шалгах, хуулийн этгээд хайх, эцсийн өмчлөгч, хувьцаа эзэмшигч, opendata 8438, les.ulaach.cc",
+        "badge": "LEGAL ENTITIES REGISTRY OPEN DATA API",
+        "accent": "#f59e0b",
+    },
 }
 
 
@@ -1026,7 +1034,7 @@ def render_og_image_svg(site: str = "portal") -> str:
 
 def render_robots_txt(host: str) -> str:
     clean_host = (host or "ulaach.cc").split(":")[0].lower()
-    if clean_host not in ("ulaach.cc", "fx.ulaach.cc", "weather.ulaach.cc", "tool.ulaach.cc", "util.ulaach.cc"):
+    if clean_host not in ("ulaach.cc", "fx.ulaach.cc", "weather.ulaach.cc", "tool.ulaach.cc", "util.ulaach.cc", "les.ulaach.cc"):
         clean_host = "ulaach.cc"
     return (
         "User-agent: *\n"
@@ -1062,6 +1070,9 @@ def render_sitemap_xml(host: str) -> str:
         ],
         "util.ulaach.cc": [
             ("https://util.ulaach.cc/", "weekly", "1.0"),
+        ],
+        "les.ulaach.cc": [
+            ("https://les.ulaach.cc/", "daily", "1.0"),
         ],
     }
 
@@ -1569,6 +1580,7 @@ def _common_head(title: str, active_site: str) -> str:
         <a class="{_cls('portal')}" href="https://ulaach.cc">Portal (ulaach.cc)</a>
         <a class="{_cls('fx')}" href="https://fx.ulaach.cc">FX Rates (fx.ulaach.cc)</a>
         <a class="{_cls('weather')}" href="https://weather.ulaach.cc">Weather &amp; AQI (weather.ulaach.cc)</a>
+        <a class="{_cls('les')}" href="https://les.ulaach.cc">Legal Entities (les.ulaach.cc)</a>
         <a class="{_cls('tool')}" href="https://tool.ulaach.cc">IP &amp; Net Tools (tool.ulaach.cc)</a>
         <a class="{_cls('util')}" href="https://util.ulaach.cc">MN Dev Utils (util.ulaach.cc)</a>
       </nav>
@@ -3653,8 +3665,17 @@ async def render_portal_page(request: Request, fx_pool: asyncpg.Pool, wx_pool: a
     ub_cond = "Тогтуун"
     ub_aqi = "—"
     wx_alert_line = ""
+    les_total = "272,869"
+    les_llc = "207,923"
+    les_fdi = "9,663"
+    les_updated = "2026-11-04"
     try:
         async with wx_pool.acquire() as conn:
+            lrow = await conn.fetchrow("SELECT total_entities, source_updated_at FROM les.metadata WHERE id = 1")
+            if lrow and lrow["total_entities"]:
+                les_total = f"{int(lrow['total_entities']):,}"
+                if lrow["source_updated_at"]:
+                    les_updated = str(lrow["source_updated_at"])[:10]
             wrow = await conn.fetchrow(
                 """
                 SELECT s.lat, s.lon, o.temp, o.wind_speed, o.ww, o.cloud_nh
@@ -3728,9 +3749,10 @@ async def render_portal_page(request: Request, fx_pool: asyncpg.Pool, wx_pool: a
       <h1>Нээлттэй Өгөгдөл ба Developer API Платформ</h1>
       <p>Монголбанк ба арилжааны банкуудын валютын ханш, Монгол орны 321 станцын цаг агаар ба агаарын чанар (AQI), сүлжээний оношилгоо болон монгол хэл/санхүүгийн хөрвүүлэлтийн нээлттэй JSON API-ууд.</p>
       <div class="status-strip">
-        <span class="stat-chip">STATUS: <strong style="color:#34d399;">4 MICROSERVICES OPERATIONAL</strong></span>
+        <span class="stat-chip">STATUS: <strong style="color:#34d399;">5 MICROSERVICES OPERATIONAL</strong></span>
         <span class="stat-chip">USD/MNT: <strong>{html.escape(usd_rate)}</strong></span>
         <span class="stat-chip">ULAANBAATAR: <strong>{html.escape(ub_temp)} ({html.escape(ub_cond)})</strong></span>
+        <span class="stat-chip">LEGAL_ENTITIES: <strong>{html.escape(les_total)} ААН</strong></span>
         <span class="stat-chip">YOUR_IP: <strong>{html.escape(visitor['ip'])} ({html.escape(visitor['country'])})</strong></span>
       </div>
       {portal_alert_html}
@@ -3812,10 +3834,741 @@ async def render_portal_page(request: Request, fx_pool: asyncpg.Pool, wx_pool: a
         </div>
         <a class="svc-btn" href="https://util.ulaach.cc">util.ulaach.cc руу орох →</a>
       </div>
+
+      <!-- 5. Legal Entities Open Data Registry (les.ulaach.cc) -->
+      <div class="svc-card" style="grid-column: 1 / -1;">
+        <div>
+          <div class="svc-head">
+            <span class="svc-domain" style="color:#f59e0b;">les.ulaach.cc</span>
+            <span class="svc-live">● OPEN DATA API</span>
+          </div>
+          <h2 class="svc-title">Монгол Улсын Хуулийн Этгээдийн Улсын Бүртгэлийн Нээлттэй Өгөгдөл &amp; API</h2>
+          <p class="svc-desc">Улсын бүртгэлийн <strong>{html.escape(les_total)}</strong> хуулийн этгээдийн регистрийн дугаар, оноосон нэр, бүртгэсэн огноо, хуулийн этгээдийн хэлбэр, үүсгэн байгуулагч / хувьцаа эзэмшигч, итгэмжлэлгүйгээр төлөөлөх захирал, эцсийн өмчлөгч (UBO), үйл ажиллагааны чиглэл ба өөрчлөн байгуулагдсан түүхийн бүх талбараар хайх систем (<code>/company.json</code>, <code>/search.json</code>, <code>/stats.json</code>).</p>
+        </div>
+        <div class="svc-metric" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;">
+          <div style="display:flex;justify-content:space-between;"><span class="muted">Нийт хуулийн этгээд:</span><strong style="color:#f59e0b;">{html.escape(les_total)} ААН</strong></div>
+          <div style="display:flex;justify-content:space-between;"><span class="muted">ХХК / Гадаадын ХО:</span><strong style="color:#38bdf8;">{html.escape(les_llc)} / {html.escape(les_fdi)}</strong></div>
+          <div style="display:flex;justify-content:space-between;"><span class="muted">Хайлтын индекс:</span><strong style="color:#34d399;">РД • Нэр • Хүн • Чиглэл</strong></div>
+          <div style="display:flex;justify-content:space-between;"><span class="muted">Өгөгдлийн огноо:</span><span>{html.escape(les_updated)}</span></div>
+        </div>
+        <a class="svc-btn" style="background:rgba(245,158,11,0.14);color:#fbbf24;border-color:rgba(245,158,11,0.4);" href="https://les.ulaach.cc">les.ulaach.cc руу орох (Бүх талбараар хайх &amp; API) →</a>
+      </div>
     </div>
 
     <div class="footer">ulaach.cc • Open Data &amp; Developer APIs Platform</div>
   </main>
+</body>
+</html>"""
+    )
+    return HTMLResponse(content=html_doc)
+
+
+# ==============================================================================
+# 5. LEGAL ENTITIES REGISTRY SERVICE (les.ulaach.cc)
+# ==============================================================================
+async def fetch_les_company(wx_pool: asyncpg.Pool, regno: str) -> dict[str, Any] | None:
+    clean_reg = (regno or "").strip()
+    if not clean_reg:
+        return None
+    async with wx_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT regno, name, registered_at, reg_year, legal_form, entity_type,
+                   shareholders, executives, beneficial_owners, activities, reorganizations
+            FROM les.entities
+            WHERE regno = $1
+            """,
+            clean_reg,
+        )
+    if not row:
+        return None
+    return {
+        "regno": row["regno"],
+        "name": row["name"],
+        "registered_at": row["registered_at"],
+        "reg_year": row["reg_year"],
+        "legal_form": row["legal_form"],
+        "entity_type": row["entity_type"],
+        "shareholders": json.loads(row["shareholders"]) if isinstance(row["shareholders"], str) else row["shareholders"],
+        "executives": json.loads(row["executives"]) if isinstance(row["executives"], str) else row["executives"],
+        "beneficial_owners": json.loads(row["beneficial_owners"]) if isinstance(row["beneficial_owners"], str) else row["beneficial_owners"],
+        "activities": json.loads(row["activities"]) if isinstance(row["activities"], str) else row["activities"],
+        "reorganizations": json.loads(row["reorganizations"]) if isinstance(row["reorganizations"], str) else row["reorganizations"],
+    }
+
+
+async def search_les_entities(
+    wx_pool: asyncpg.Pool,
+    q: str = "",
+    field: str = "all",
+    legal_form: str = "",
+    entity_type: str = "",
+    year: int | None = None,
+    limit: int = 25,
+    offset: int = 0,
+) -> dict[str, Any]:
+    t0 = time.perf_counter()
+    clean_q = (q or "").strip()
+    clean_field = (field or "all").strip().lower()
+    clean_form = (legal_form or "").strip()
+    clean_type = (entity_type or "").strip()
+    lim = max(1, min(int(limit or 25), 100))
+    off = max(0, int(offset or 0))
+
+    where_clauses: list[str] = []
+    params: list[Any] = []
+
+    if clean_q:
+        if clean_field == "regno" or (clean_q.isdigit() and len(clean_q) == 7 and clean_field == "all"):
+            params.append(clean_q)
+            where_clauses.append(f"regno = ${len(params)}")
+        elif clean_field == "name":
+            params.append(f"%{clean_q}%")
+            where_clauses.append(f"name ILIKE ${len(params)}")
+        elif clean_field == "person":
+            params.append(f"%{clean_q}%")
+            where_clauses.append(f"people_text ILIKE ${len(params)}")
+        elif clean_field == "activity":
+            params.append(f"%{clean_q}%")
+            where_clauses.append(f"activities_text ILIKE ${len(params)}")
+        else:
+            # All fields: if numeric prefix or general text, search name, people_text, activities_text, regno
+            if clean_q.isdigit():
+                params.append(f"{clean_q}%")
+                where_clauses.append(f"regno LIKE ${len(params)}")
+            else:
+                params.append(f"%{clean_q}%")
+                idx_p = len(params)
+                where_clauses.append(
+                    f"(name ILIKE ${idx_p} OR people_text ILIKE ${idx_p} OR activities_text ILIKE ${idx_p})"
+                )
+
+    if clean_form:
+        params.append(clean_form)
+        where_clauses.append(f"legal_form = ${len(params)}")
+    if clean_type:
+        params.append(clean_type)
+        where_clauses.append(f"entity_type = ${len(params)}")
+    if year is not None:
+        params.append(int(year))
+        where_clauses.append(f"reg_year = ${len(params)}")
+
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+    # Order exact name match first when searching by name/all
+    order_sql = "ORDER BY reg_year DESC NULLS LAST, registered_at DESC, regno DESC"
+    if clean_q and not clean_q.isdigit() and clean_field in ("all", "name"):
+        params.append(clean_q)
+        exact_idx = len(params)
+        order_sql = f"ORDER BY (LOWER(name) = LOWER(${exact_idx})) DESC, reg_year DESC NULLS LAST, registered_at DESC"
+
+    params.append(lim)
+    lim_idx = len(params)
+    params.append(off)
+    off_idx = len(params)
+
+    query_sql = f"""
+        SELECT regno, name, registered_at, reg_year, legal_form, entity_type,
+               shareholders, executives, beneficial_owners, activities, reorganizations
+        FROM les.entities
+        {where_sql}
+        {order_sql}
+        LIMIT ${lim_idx} OFFSET ${off_idx}
+    """
+
+    async with wx_pool.acquire() as conn:
+        rows = await conn.fetch(query_sql, *params)
+
+    items = []
+    for r in rows:
+        sh = json.loads(r["shareholders"]) if isinstance(r["shareholders"], str) else r["shareholders"]
+        ex = json.loads(r["executives"]) if isinstance(r["executives"], str) else r["executives"]
+        ub = json.loads(r["beneficial_owners"]) if isinstance(r["beneficial_owners"], str) else r["beneficial_owners"]
+        ac = json.loads(r["activities"]) if isinstance(r["activities"], str) else r["activities"]
+        re_list = json.loads(r["reorganizations"]) if isinstance(r["reorganizations"], str) else r["reorganizations"]
+        items.append(
+            {
+                "regno": r["regno"],
+                "name": r["name"],
+                "registered_at": r["registered_at"],
+                "reg_year": r["reg_year"],
+                "legal_form": r["legal_form"],
+                "entity_type": r["entity_type"],
+                "shareholders_count": len(sh),
+                "executives_count": len(ex),
+                "beneficial_owners_count": len(ub),
+                "activities_count": len(ac),
+                "shareholders": sh,
+                "executives": ex,
+                "beneficial_owners": ub,
+                "activities": ac,
+                "reorganizations": re_list,
+            }
+        )
+
+    elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
+    return {
+        "query": clean_q,
+        "field": clean_field,
+        "legal_form": clean_form or None,
+        "entity_type": clean_type or None,
+        "year": year,
+        "limit": lim,
+        "offset": off,
+        "returned": len(items),
+        "elapsed_ms": elapsed_ms,
+        "items": items,
+    }
+
+
+async def fetch_les_stats(wx_pool: asyncpg.Pool) -> dict[str, Any]:
+    async with wx_pool.acquire() as conn:
+        mrow = await conn.fetchrow(
+            """
+            SELECT dataview_id, file_id, file_size_bytes, source_updated_at,
+                   imported_at AT TIME ZONE 'Asia/Ulaanbaatar' AS imported_ub,
+                   total_entities, summary_stats
+            FROM les.metadata
+            WHERE id = 1
+            """
+        )
+    if not mrow:
+        return {"total_entities": 0, "summary_stats": {}}
+    st = json.loads(mrow["summary_stats"]) if isinstance(mrow["summary_stats"], str) else mrow["summary_stats"]
+    return {
+        "dataset": "Хуулийн этгээдийн улсын бүртгэлийн нээлттэй өгөгдөл",
+        "dataview_id": mrow["dataview_id"],
+        "file_id": mrow["file_id"],
+        "file_size_mb": round(float(mrow["file_size_bytes"] or 0) / (1024 * 1024), 2),
+        "source_updated_at": mrow["source_updated_at"],
+        "imported_at_ub": mrow["imported_ub"].strftime("%Y-%m-%d %H:%M:%S") if mrow["imported_ub"] else None,
+        "total_entities": mrow["total_entities"],
+        "stats": st,
+    }
+
+
+async def render_les_page(wx_pool: asyncpg.Pool) -> HTMLResponse:
+    stats_data = await fetch_les_stats(wx_pool)
+    initial_search = await search_les_entities(wx_pool, q="", field="all", limit=15)
+
+    st = stats_data.get("stats") or {}
+    totals = st.get("totals") or {}
+    by_form = st.get("by_legal_form") or []
+    by_type = st.get("by_entity_type") or []
+    by_year = st.get("by_year") or []
+
+    total_ent = int(totals.get("total_entities") or stats_data.get("total_entities") or 272869)
+    with_sh = int(totals.get("with_shareholders") or 0)
+    with_ex = int(totals.get("with_executives") or 0)
+    with_ubo = int(totals.get("with_ubo") or 0)
+    with_act = int(totals.get("with_activities") or 0)
+    with_reorg = int(totals.get("with_reorg") or 0)
+    src_updated = str(stats_data.get("source_updated_at") or "2026-11-04")
+    fsize_mb = stats_data.get("file_size_mb") or 440.15
+
+    form_options_html = ['<option value="">Бүх хэлбэр (272,869)</option>']
+    form_rows_html = []
+    for idx_f, f_item in enumerate(by_form, start=1):
+        lbl = str(f_item.get("label") or "")
+        cnt = int(f_item.get("count") or 0)
+        pct = (cnt * 100.0 / total_ent) if total_ent else 0.0
+        form_options_html.append(f'<option value="{html.escape(lbl)}">{html.escape(lbl)} ({cnt:,})</option>')
+        form_rows_html.append(
+            f"<tr>"
+            f"<td class='mono muted'>{idx_f:02d}</td>"
+            f"<td class='bold'>{html.escape(lbl)}</td>"
+            f"<td class='r mono bold' style='color:#38bdf8;'>{cnt:,}</td>"
+            f"<td class='r mono' style='color:#34d399;'>{pct:.2f}%</td>"
+            f"</tr>"
+        )
+
+    year_options_html = ['<option value="">Бүх он (1991–2026)</option>']
+    for y_item in reversed(by_year):
+        yr = y_item.get("year")
+        cnt = int(y_item.get("count") or 0)
+        if yr:
+            year_options_html.append(f'<option value="{yr}">{yr} он ({cnt:,} ААН)</option>')
+
+    by_year_json = json.dumps(by_year, ensure_ascii=False)
+    initial_items_json = json.dumps(initial_search.get("items") or [], ensure_ascii=False)
+
+    html_doc = (
+        _common_head("les.ulaach.cc — Монгол Улсын Хуулийн Этгээдийн Бүртгэлийн Нээлттэй Өгөгдөл & API", "les")
+        + f"""
+  <main class="wrap">
+    <section class="hero">
+      <div class="mono" style="font-size:12px;color:#f59e0b;">LEGAL ENTITIES OPEN DATA REGISTRY // PG_TRGM FULL-FIELD INDEX</div>
+      <h1>Монгол Улсын Хуулийн Этгээдийн Бүртгэлийн Нээлттэй Өгөгдөл &amp; Developer API</h1>
+      <p>Монгол улсад бүртгэлтэй <strong>{total_ent:,}</strong> хуулийн этгээдийн регистрийн дугаар, оноосон нэр, бүртгэсэн огноо, хэлбэр, үүсгэн байгуулагч / хувьцаа эзэмшигч, итгэмжлэлгүйгээр төлөөлөх албан тушаалтан, эцсийн өмчлөгч (UBO), үйл ажиллагааны чиглэл ба өөрчлөн байгуулагдсан түүхийн лавлагаа.</p>
+      <div class="status-strip">
+        <span class="stat-chip">TOTAL_ENTITIES: <strong style="color:#f59e0b;">{total_ent:,}</strong></span>
+        <span class="stat-chip">EXECUTIVES: <strong style="color:#38bdf8;">{with_ex:,}</strong></span>
+        <span class="stat-chip">SHAREHOLDERS: <strong style="color:#34d399;">{with_sh:,}</strong></span>
+        <span class="stat-chip">BENEFICIAL_OWNERS: <strong>{with_ubo:,}</strong></span>
+        <span class="stat-chip">DATA_SIZE: <strong>{fsize_mb} MB ({html.escape(src_updated[:10])})</strong></span>
+      </div>
+    </section>
+
+    <!-- 01. Interactive Full-Field Search Engine -->
+    <section class="section-card">
+      <div class="section-head">
+        <h2 class="section-title"><span class="step-badge">01</span> Бүх Талбараар Шууд Хайх Систем (РД, Нэр, Хувьцаа эзэмшигч, Захирал, Эцсийн өмчлөгч, Чиглэл)</h2>
+        <span class="section-meta">PostgreSQL GIN Trigram Index • Хурд: ~1–5 ms</span>
+      </div>
+      <div class="section-body">
+        <form id="les-search-form" style="display:grid;grid-template-columns:2fr 1.1fr 1.2fr 0.9fr auto;gap:10px;align-items:end;margin-bottom:14px;">
+          <div>
+            <label class="mono muted" style="display:block;font-size:11px;margin-bottom:5px;">ХАЙХ УТГА (РД, КОМПАНИЙН НЭР, ХҮНИЙ ОВОГ/НЭР, ҮЙЛ АЖИЛЛАГАА):</label>
+            <input id="les-q" class="inp" type="text" placeholder="Жишээ: 5296722, Голомт, Чойжилсүрэн, програм хангамж..." style="width:100%;padding:9px 12px;font-size:13.5px;" />
+          </div>
+          <div>
+            <label class="mono muted" style="display:block;font-size:11px;margin-bottom:5px;">ХАЙХ ТАЛБАР:</label>
+            <select id="les-field" class="inp" style="width:100%;padding:9px 10px;">
+              <option value="all">🔍 Бүх талбараар</option>
+              <option value="name">🏢 Оноосон нэрээр</option>
+              <option value="regno">🔢 Регистрийн дугаараар (РД)</option>
+              <option value="person">👤 Захирал / Хувьцаа эзэмшигч / Эцсийн өмчлөгчөөр</option>
+              <option value="activity">⚙️ Үйл ажиллагааны чиглэлээр</option>
+            </select>
+          </div>
+          <div>
+            <label class="mono muted" style="display:block;font-size:11px;margin-bottom:5px;">ХУУЛИЙН ЭТГЭЭДИЙН ХЭЛБЭР:</label>
+            <select id="les-form" class="inp" style="width:100%;padding:9px 10px;">
+              {''.join(form_options_html)}
+            </select>
+          </div>
+          <div>
+            <label class="mono muted" style="display:block;font-size:11px;margin-bottom:5px;">БҮРТГЭСЭН ОН:</label>
+            <select id="les-year" class="inp" style="width:100%;padding:9px 10px;">
+              {''.join(year_options_html)}
+            </select>
+          </div>
+          <div>
+            <button type="submit" class="run-btn" style="padding:9px 18px;font-size:13px;height:38px;">Хайх →</button>
+          </div>
+        </form>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span class="mono muted" style="font-size:11.5px;">Жишээ хайлт:</span>
+            <button type="button" class="copy-btn les-Preset" data-q="Голомт" data-field="name">🏢 Голомт</button>
+            <button type="button" class="copy-btn les-Preset" data-q="Таван богд" data-field="all">🏢 Таван богд</button>
+            <button type="button" class="copy-btn les-Preset" data-q="Оюу толгой" data-field="name">🏢 Оюу толгой</button>
+            <button type="button" class="copy-btn les-Preset" data-q="Чойжилсүрэн" data-field="person">👤 Чойжилсүрэн (Хүнээр)</button>
+            <button type="button" class="copy-btn les-Preset" data-q="Оджаргал" data-field="person">👤 Оджаргал (Хүнээр)</button>
+            <button type="button" class="copy-btn les-Preset" data-q="програм хангамж" data-field="activity">⚙️ Програм хангамж (Чиглэлээр)</button>
+          </div>
+          <div id="les-search-meta" class="mono muted" style="font-size:12px;">Сүүлд бүртгэгдсэн 15 хуулийн этгээд</div>
+        </div>
+
+        <div id="les-detail-box" style="display:none;margin-bottom:18px;background:var(--bg-code);border:1px solid #f59e0b;border-radius:10px;padding:18px;"></div>
+
+        <div class="table-wrap">
+          <table style="table-layout:fixed;width:100%;">
+            <thead>
+              <tr>
+                <th style="width:78px;">РД</th>
+                <th style="width:17%;">ОНООСОН НЭР</th>
+                <th style="width:92px;">БҮРТГЭСЭН</th>
+                <th style="width:14%;">ХЭЛБЭР / ТӨРӨЛ</th>
+                <th style="width:15%;">УДИРДЛАГА</th>
+                <th style="width:15%;">ХУВЬЦАА / UBO</th>
+                <th>ҮЙЛ АЖИЛЛАГАА</th>
+                <th class="r" style="width:76px;">ЛАВЛАХ</th>
+              </tr>
+            </thead>
+            <tbody id="les-results-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 02. Шууд дуудах Developer JSON API Endpoint-ууд -->
+    <section class="section-card">
+      <div class="section-head">
+        <h2 class="section-title"><span class="step-badge">02</span> Шууд дуудах JSON API Endpoint-ууд</h2>
+        <span class="section-meta">Content-Type: application/json; charset=utf-8</span>
+      </div>
+      <div class="section-body">
+        <div class="ep-list">
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/company.json?regno=2585065" target="_blank">/company.json?regno=2585065</a>
+            </div>
+            <span class="ep-desc">Регистрийн дугаараар (7 цифр) хуулийн этгээдийн бүх мэдээллийг (хувьцаа эзэмшигч, захирал, UBO, чиглэл, өөрчлөлт) шууд авах</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/search.json?q=Голомт&field=name&limit=10" target="_blank">/search.json?q=Голомт&amp;field=name&amp;limit=10</a>
+            </div>
+            <span class="ep-desc">Бүх талбараар хайх API (<code>field=all|name|regno|person|activity</code>, <code>legal_form</code>, <code>entity_type</code>, <code>year</code>, <code>limit</code>, <code>offset</code>)</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/search.json?q=Чойжилсүрэн&field=person&limit=10" target="_blank">/search.json?q=Чойжилсүрэн&amp;field=person&amp;limit=10</a>
+            </div>
+            <span class="ep-desc">Хувьцаа эзэмшигч, гүйцэтгэх удирдлага болон эцсийн өмчлөгчийн овог/нэрээр хамаарал бүхий компаниудыг шүүж олох</span>
+          </div>
+          <div class="ep-item">
+            <div class="ep-left">
+              <span class="method-get">GET</span>
+              <a class="ep-url" href="/stats.json" target="_blank">/stats.json</a>
+            </div>
+            <span class="ep-desc">Улсын бүртгэлийн нийт хуулийн этгээдийн статистик (хэлбэр, төрөл, 1991–2026 оны бүртгэлийн динамик ба шинэчлэгдсэн огноо)</span>
+          </div>
+        </div>
+
+        <div class="code-split">
+          <div class="code-pane">
+            <div class="code-pane-bar">
+              <span>cURL &amp; JavaScript Fetch жишээ</span>
+              <button class="copy-btn" data-copy="les-curl-code">Copy</button>
+            </div>
+            <pre id="les-curl-code"># 1. Регистрийн дугаараар компанийн бүрэн мэдээлэл авах
+curl -s "https://les.ulaach.cc/company.json?regno=2585065" | jq .
+
+# 2. Захирал / Хувьцаа эзэмшигч / Эцсийн өмчлөгчийн нэрээр хайх
+curl -s "https://les.ulaach.cc/search.json?q=Чойжилсүрэн&amp;field=person&amp;limit=10" | jq .
+
+# 3. Үйл ажиллагааны чиглэл ба оноор давхар шүүх
+curl -s "https://les.ulaach.cc/search.json?q=програм&amp;field=activity&amp;year=2024"</pre>
+          </div>
+          <div class="code-pane">
+            <div class="code-pane-bar">
+              <span>200 OK — /company.json?regno=2585065</span>
+            </div>
+            <pre>{{
+  "regno": "2585065",
+  "name": "Хурдхүнс",
+  "registered_at": "2005.12.21",
+  "reg_year": 2005,
+  "legal_form": "Хязгаарлагдмал хариуцлагатай компани",
+  "entity_type": "Ашгийн төлөө",
+  "shareholders": [
+    {{
+      "kind": "Иргэн",
+      "country": "Монгол Улс",
+      "last_name": "баттогтох",
+      "first_name": "чойжилсүрэн",
+      "gender": "Эр",
+      "registered_at": "2005.12.21"
+    }}
+  ],
+  "executives": [
+    {{
+      "title": "Гүйцэтгэх захирал",
+      "country": "Монгол Улс",
+      "last_name": "Баттогтох",
+      "first_name": "Чойжилсүрэн",
+      "gender": "Эр",
+      "registered_at": "2005.12.21"
+    }}
+  ]
+}}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 03. Registration Trends Chart (amCharts 5) & Legal Form Breakdown -->
+    <section class="section-card">
+      <div class="section-head">
+        <h2 class="section-title"><span class="step-badge">03</span> Жил Бүрийн Шинээр Бүртгэгдсэн Хуулийн Этгээдийн Тоо (2005–2026) &amp; Хэлбэрийн Ангилал</h2>
+        <span class="section-meta">amCharts 5 Interactive Chart • GET /stats.json</span>
+      </div>
+      <div class="section-body">
+        <div style="background:linear-gradient(180deg,rgba(15,23,42,0.88) 0%,rgba(7,10,18,0.96) 100%);border:1px solid var(--border-strong);border-radius:10px;padding:16px;margin-bottom:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+            <div>
+              <div class="mono bold" style="font-size:13px;color:#f8fafc;">📊 ОН ТУС БҮРЭЭР БҮРТГЭГДСЭН ХУУЛИЙН ЭТГЭЭДИЙН ТОО (2005–2026)</div>
+              <div class="muted" style="font-size:12px;">Багана дээр хулгана ойртуулж тухайн онд бүртгэгдсэн ААН-ийн тоог харна уу (багана дээр дарвал тухайн оноор шүүнэ)</div>
+            </div>
+          </div>
+          <div id="les-year-chart" style="width:100%;height:290px;"></div>
+        </div>
+
+        <div class="mono bold" style="font-size:12.5px;color:#38bdf8;margin-bottom:8px;">📋 ХУУЛИЙН ЭТГЭЭДИЙН ХЭЛБЭРИЙН ЗАДАРГАА (ТОП 12 АНГИЛАЛ)</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:60px;">#</th>
+                <th>ХУУЛИЙН ЭТГЭЭДИЙН ХЭЛБЭР (LEGAL FORM)</th>
+                <th class="r">НИЙТ ТОО</th>
+                <th class="r">ЭЗЛЭХ ХУВЬ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {''.join(form_rows_html)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">les.ulaach.cc • Legal Entities Registry Open Data API • Powered by ulaach.cc</div>
+  </main>
+
+  <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+  <script src="https://cdn.amcharts.com/lib/5/xy.js"></script>
+  <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+  <script>
+    (function() {{
+      var INITIAL_ITEMS = {initial_items_json};
+      var BY_YEAR = {by_year_json}.filter(function(r) {{ return r.year >= 2005; }});
+
+      function esc(s) {{
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+      }}
+
+      function renderPeopleSummary(list, isExec) {{
+        if (!list || !list.length) return '<span class="muted">—</span>';
+        var parts = list.slice(0, 2).map(function(p) {{
+          var full = ((p.last_name || '') + ' ' + (p.first_name || '')).trim();
+          if (!full && p.country) full = p.country;
+          var role = isExec ? (p.title ? '<span class="muted" style="font-size:11px;">[' + esc(p.title) + ']</span> ' : '') : '';
+          return role + '<strong style="color:#f8fafc;">' + esc(full || '—') + '</strong>';
+        }});
+        if (list.length > 2) {{
+          parts.push('<span class="mono muted" style="font-size:11px;">(+' + (list.length - 2) + ')</span>');
+        }}
+        return parts.join('<br>');
+      }}
+
+      function renderActivitiesSummary(list) {{
+        if (!list || !list.length) return '<span class="muted">—</span>';
+        var first = list[0].description || '';
+        if (first.length > 44) first = first.slice(0, 42) + '…';
+        var extra = list.length > 1 ? ' <span class="mono" style="color:#38bdf8;font-size:11px;">(+' + (list.length - 1) + ')</span>' : '';
+        return esc(first) + extra;
+      }}
+
+      var currentItemsMap = {{}};
+
+      function showEntityDetail(regno) {{
+        var item = currentItemsMap[regno];
+        var box = document.getElementById('les-detail-box');
+        if (!item || !box) return;
+
+        var shRows = (item.shareholders || []).map(function(p) {{
+          return '<tr><td>' + esc(p.kind) + '</td><td>' + esc(p.country) + '</td><td class="bold">' + esc(p.last_name) + ' ' + esc(p.first_name) + '</td><td>' + esc(p.gender) + '</td><td class="mono">' + esc(p.registered_at) + '</td></tr>';
+        }}).join('') || '<tr><td colspan="5" class="muted">Бүртгэлгүй</td></tr>';
+
+        var exRows = (item.executives || []).map(function(p) {{
+          return '<tr><td style="color:#38bdf8;">' + esc(p.title) + '</td><td>' + esc(p.country) + '</td><td class="bold">' + esc(p.last_name) + ' ' + esc(p.first_name) + '</td><td>' + esc(p.gender) + '</td><td class="mono">' + esc(p.registered_at) + '</td></tr>';
+        }}).join('') || '<tr><td colspan="5" class="muted">Бүртгэлгүй</td></tr>';
+
+        var uboRows = (item.beneficial_owners || []).map(function(p) {{
+          return '<tr><td>' + esc(p.kind) + '</td><td class="bold">' + esc(p.last_name) + ' ' + esc(p.first_name) + '</td><td>' + esc(p.country) + '</td><td>' + esc(p.gender) + '</td></tr>';
+        }}).join('') || '<tr><td colspan="4" class="muted">Бүртгэлгүй</td></tr>';
+
+        var actBadges = (item.activities || []).map(function(a) {{
+          return '<div style="background:#0f1523;border:1px solid #1e293b;border-radius:6px;padding:6px 10px;font-size:12px;"><span class="mono" style="color:#34d399;font-size:11px;">[' + esc(a.registered_at || '—') + ']</span> ' + esc(a.description) + '</div>';
+        }}).join('') || '<div class="muted">Чиглэл бүртгэгдээгүй</div>';
+
+        var reorgHtml = '';
+        if (item.reorganizations && item.reorganizations.length) {{
+          var rRows = item.reorganizations.map(function(r) {{
+            return '<tr><td>' + esc(r.mode) + '</td><td class="mono">' + esc(r.registered_at) + '</td><td class="bold">' + esc(r.prev_name) + '</td><td style="white-space:normal;">' + esc(r.note) + '</td></tr>';
+          }}).join('');
+          reorgHtml = '<div style="margin-top:12px;"><div class="mono bold" style="font-size:12px;color:#f43f5e;margin-bottom:6px;">🔄 ӨӨРЧЛӨН БАЙГУУЛАГДСАН ТҮҮХ:</div><div class="table-wrap"><table><thead><tr><th>ХЭЛБЭР</th><th>ОГНОО</th><th>ӨМНӨХ НЭР</th><th>ТЭМДЭГЛЭЛ</th></tr></thead><tbody>' + rRows + '</tbody></table></div></div>';
+        }}
+
+        box.innerHTML =
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px;border-bottom:1px solid #1e293b;padding-bottom:12px;">' +
+            '<div>' +
+              '<div class="mono" style="font-size:12px;color:#f59e0b;">РЕГИСТРИЙН ДУГААР: <strong>' + esc(item.regno) + '</strong> • БҮРТГЭСЭН: <strong>' + esc(item.registered_at) + '</strong></div>' +
+              '<h3 style="margin:4px 0;font-size:20px;color:#f8fafc;">' + esc(item.name) + '</h3>' +
+              '<div style="font-size:12.5px;color:#94a3b8;">' + esc(item.legal_form) + ' • <span style="color:#34d399;">' + esc(item.entity_type) + '</span></div>' +
+            '</div>' +
+            '<div style="display:flex;gap:8px;">' +
+              '<a class="run-btn" href="/company.json?regno=' + encodeURIComponent(item.regno) + '" target="_blank" style="text-decoration:none;">JSON API →</a>' +
+              '<button type="button" class="copy-btn" onclick="document.getElementById(\\'les-detail-box\\').style.display=\\'none\\'">Хаах ✕</button>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr;gap:12px;">' +
+            '<div><div class="mono bold" style="font-size:12px;color:#38bdf8;margin-bottom:6px;">👔 ИТГЭМЖЛЭЛГҮЙГЭЭР ТӨЛӨӨЛӨХ АЛБАН ТУШААЛТАН (' + (item.executives || []).length + '):</div>' +
+              '<div class="table-wrap"><table><thead><tr><th>АЛБАН ТУШААЛ</th><th>УЛС</th><th>ОВОГ НЭР</th><th>ХҮЙС</th><th>БҮРТГЭСЭН</th></tr></thead><tbody>' + exRows + '</tbody></table></div></div>' +
+            '<div><div class="mono bold" style="font-size:12px;color:#34d399;margin-bottom:6px;">🤝 ХУВЬЦАА ЭЗЭМШИГЧ, ГИШҮҮНИЙ МЭДЭЭЛЭЛ (' + (item.shareholders || []).length + '):</div>' +
+              '<div class="table-wrap"><table><thead><tr><th>АНГИЛАЛ</th><th>УЛС</th><th>ОВОГ НЭР</th><th>ХҮЙС</th><th>БҮРТГЭСЭН</th></tr></thead><tbody>' + shRows + '</tbody></table></div></div>' +
+            '<div><div class="mono bold" style="font-size:12px;color:#fbbf24;margin-bottom:6px;">🛡️ ЭЦСИЙН ӨМЧЛӨГЧ / UBO (' + (item.beneficial_owners || []).length + '):</div>' +
+              '<div class="table-wrap"><table><thead><tr><th>АНГИЛАЛ</th><th>ОВОГ НЭР</th><th>УЛС</th><th>ХҮЙС</th></tr></thead><tbody>' + uboRows + '</tbody></table></div></div>' +
+            '<div><div class="mono bold" style="font-size:12px;color:#a78bfa;margin-bottom:6px;">⚙️ ҮЙЛ АЖИЛЛАГААНЫ ЧИГЛЭЛҮҮД (' + (item.activities || []).length + '):</div>' +
+              '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">' + actBadges + '</div></div>' +
+            reorgHtml +
+          '</div>';
+        box.style.display = 'block';
+        box.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
+      }}
+      window.showEntityDetail = showEntityDetail;
+
+      function renderTableRows(items) {{
+        var tbody = document.getElementById('les-results-tbody');
+        currentItemsMap = {{}};
+        if (!items || !items.length) {{
+          tbody.innerHTML = '<tr><td colspan="8" class="c muted" style="padding:24px;">Тохирох хуулийн этгээд олдсонгүй. Хайх үгээ өөрчилж үзнэ үү.</td></tr>';
+          return;
+        }}
+        var htmlRows = items.map(function(it) {{
+          currentItemsMap[it.regno] = it;
+          var shOrUbo = (it.shareholders && it.shareholders.length) ? it.shareholders : (it.beneficial_owners || []);
+          return '<tr style="cursor:pointer;" onclick="window.showEntityDetail(\\'' + esc(it.regno) + '\\')">' +
+            '<td class="mono bold" style="color:#f59e0b;">' + esc(it.regno) + '</td>' +
+            '<td class="bold" style="color:#f8fafc;white-space:normal;word-break:break-word;">' + esc(it.name) + '</td>' +
+            '<td class="mono muted">' + esc(it.registered_at || '—') + '</td>' +
+            '<td style="white-space:normal;word-break:break-word;font-size:12px;">' + esc(it.legal_form) + '<br><span class="mono muted" style="font-size:11px;">' + esc(it.entity_type) + '</span></td>' +
+            '<td style="white-space:normal;word-break:break-word;font-size:12px;">' + renderPeopleSummary(it.executives, true) + '</td>' +
+            '<td style="white-space:normal;word-break:break-word;font-size:12px;">' + renderPeopleSummary(shOrUbo, false) + '</td>' +
+            '<td style="white-space:normal;word-break:break-word;font-size:12px;color:#cbd5e1;">' + renderActivitiesSummary(it.activities) + '</td>' +
+            '<td class="r"><button type="button" class="copy-btn" style="padding:4px 8px;font-size:11px;" onclick="event.stopPropagation();window.showEntityDetail(\\'' + esc(it.regno) + '\\')">Харах</button></td>' +
+          '</tr>';
+        }}).join('');
+        tbody.innerHTML = htmlRows;
+      }}
+
+      function runLesSearch() {{
+        var q = document.getElementById('les-q').value.trim();
+        var field = document.getElementById('les-field').value;
+        var form = document.getElementById('les-form').value;
+        var year = document.getElementById('les-year').value;
+        var metaEl = document.getElementById('les-search-meta');
+        metaEl.textContent = 'Хайж байна...';
+
+        var params = new URLSearchParams();
+        if (q) params.set('q', q);
+        if (field) params.set('field', field);
+        if (form) params.set('legal_form', form);
+        if (year) params.set('year', year);
+        params.set('limit', '30');
+
+        fetch('/search.json?' + params.toString())
+          .then(function(r) {{ return r.json(); }})
+          .then(function(data) {{
+            var items = data.items || [];
+            renderTableRows(items);
+            metaEl.textContent = 'Илэрц: ' + items.length + ' ААН • Хайлтын хугацаа: ' + (data.elapsed_ms || 0) + ' ms';
+            if (items.length === 1) {{
+              showEntityDetail(items[0].regno);
+            }} else {{
+              document.getElementById('les-detail-box').style.display = 'none';
+            }}
+          }})
+          .catch(function() {{
+            metaEl.textContent = 'Хайлт амжилтгүй боллоо.';
+          }});
+      }}
+
+      document.getElementById('les-search-form').addEventListener('submit', function(e) {{
+        e.preventDefault();
+        runLesSearch();
+      }});
+      document.getElementById('les-form').addEventListener('change', runLesSearch);
+      document.getElementById('les-year').addEventListener('change', runLesSearch);
+
+      document.querySelectorAll('.les-Preset').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+          document.getElementById('les-q').value = btn.getAttribute('data-q') || '';
+          document.getElementById('les-field').value = btn.getAttribute('data-field') || 'all';
+          document.getElementById('les-form').value = '';
+          document.getElementById('les-year').value = '';
+          runLesSearch();
+        }});
+      }});
+
+      document.querySelectorAll('.copy-btn[data-copy]').forEach(function(btn) {{
+        btn.addEventListener('click', function() {{
+          var tid = btn.getAttribute('data-copy');
+          var el = document.getElementById(tid);
+          if (!el) return;
+          navigator.clipboard.writeText(el.innerText.trim());
+          var old = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(function() {{ btn.textContent = old; }}, 1200);
+        }});
+      }});
+
+      renderTableRows(INITIAL_ITEMS);
+
+      // Render amCharts 5 Year Trend Chart
+      if (window.am5 && window.am5xy && BY_YEAR.length) {{
+        var root = am5.Root.new('les-year-chart');
+        root.setThemes([am5themes_Animated.new(root)]);
+        var chart = root.container.children.push(
+          am5xy.XYChart.new(root, {{
+            panX: false,
+            panY: false,
+            layout: root.verticalLayout
+          }})
+        );
+        var xRenderer = am5xy.AxisRendererX.new(root, {{ minGridDistance: 28 }});
+        xRenderer.labels.template.setAll({{
+          fill: am5.color(0x94a3b8),
+          fontSize: 11,
+          fontFamily: 'JetBrains Mono, monospace'
+        }});
+        xRenderer.grid.template.setAll({{ stroke: am5.color(0x1e293b), strokeOpacity: 0.5 }});
+        var xAxis = chart.xAxes.push(
+          am5xy.CategoryAxis.new(root, {{
+            categoryField: 'yearStr',
+            renderer: xRenderer
+          }})
+        );
+        var yRenderer = am5xy.AxisRendererY.new(root, {{}});
+        yRenderer.labels.template.setAll({{
+          fill: am5.color(0x94a3b8),
+          fontSize: 11,
+          fontFamily: 'JetBrains Mono, monospace'
+        }});
+        yRenderer.grid.template.setAll({{ stroke: am5.color(0x1e293b), strokeOpacity: 0.6 }});
+        var yAxis = chart.yAxes.push(
+          am5xy.ValueAxis.new(root, {{ renderer: yRenderer, min: 0 }})
+        );
+
+        var series = chart.series.push(
+          am5xy.ColumnSeries.new(root, {{
+            name: 'Бүртгэгдсэн ААН',
+            xAxis: xAxis,
+            yAxis: yAxis,
+            valueYField: 'count',
+            categoryXField: 'yearStr',
+            tooltip: am5.Tooltip.new(root, {{
+              autoTextColor: false,
+              labelText: '[bold #ffffff]{{categoryX}} он: {{valueY}} ААН[/]'
+            }})
+          }})
+        );
+        series.columns.template.setAll({{
+          cornerRadiusTL: 5,
+          cornerRadiusTR: 5,
+          fill: am5.color(0xf59e0b),
+          strokeOpacity: 0,
+          cursorOverStyle: 'pointer'
+        }});
+        series.columns.template.states.create('hover', {{
+          fill: am5.color(0x38bdf8)
+        }});
+        series.columns.template.events.on('click', function(ev) {{
+          var ctx = ev.target.dataItem && ev.target.dataItem.dataContext;
+          if (ctx && ctx.year) {{
+            document.getElementById('les-year').value = String(ctx.year);
+            runLesSearch();
+          }}
+        }});
+
+        var chartData = BY_YEAR.map(function(d) {{
+          return {{ year: d.year, yearStr: String(d.year), count: d.count }};
+        }});
+        xAxis.data.setAll(chartData);
+        series.data.setAll(chartData);
+        chart.set('cursor', am5xy.XYCursor.new(root, {{ behavior: 'none' }}));
+      }}
+    }})();
+  </script>
 </body>
 </html>"""
     )
